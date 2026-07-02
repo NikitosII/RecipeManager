@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RecipeManager.Application.Interfaces;
+using RecipeManager.Domain.Interfaces;
 using RecipeManager.Infrastructure.Persistence;
+using RecipeManager.Infrastructure.Repositories;
 
 namespace RecipeManager.Infrastructure;
 
@@ -15,8 +17,11 @@ public static class DependencyInjection
         services.AddDbContext<RecipeDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("RecipeDb")));
 
-        services.AddScoped<IRecipeDbContext>(provider =>
-            provider.GetRequiredService<RecipeDbContext>());
+        services.AddScoped<IRecipeDbContext>(sp => sp.GetRequiredService<RecipeDbContext>());
+
+        services.AddScoped<IRecipeRepository, RecipeRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IIngredientRepository, IngredientRepository>();
 
         return services;
     }
