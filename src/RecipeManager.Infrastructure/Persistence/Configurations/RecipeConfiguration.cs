@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RecipeManager.Domain.Entities;
+using RecipeManager.Infrastructure.Identity;
 
 namespace RecipeManager.Infrastructure.Persistence.Configurations;
 
@@ -15,8 +16,8 @@ public class RecipeConfiguration : IEntityTypeConfiguration<Recipe>
         builder.Property(r => r.ImageUrl).HasMaxLength(500);
         builder.Property(r => r.DifficultyLevel).IsRequired();
 
-        builder.HasOne(r => r.User)
-               .WithMany(u => u.Recipes)
+        builder.HasOne<ApplicationUser>()
+               .WithMany()
                .HasForeignKey(r => r.UserId)
                .OnDelete(DeleteBehavior.Cascade);
 
