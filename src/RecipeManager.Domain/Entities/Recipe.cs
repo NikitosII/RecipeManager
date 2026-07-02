@@ -48,7 +48,6 @@ public class Recipe : BaseEntity
     public Category? Category { get; private set; }
 
     public Guid UserId { get; private set; }
-    public User? User { get; private set; }
 
     // -- Basic updates -- //
 
