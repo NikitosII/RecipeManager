@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RecipeManager.Application.Features.Categories.Commands;
 using RecipeManager.Application.Features.Categories.Queries;
@@ -26,9 +27,8 @@ public class CategoriesController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] CreateCategoryRequest request,
-        CancellationToken cancellationToken)
+    [Authorize]
+    public async Task<IActionResult> Create([FromBody] CreateCategoryRequest request, CancellationToken cancellationToken)
     {
         var id = await mediator.Send(
             new CreateCategoryCommand(request.Name, request.Slug),
@@ -38,6 +38,7 @@ public class CategoriesController(IMediator mediator) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await mediator.Send(new DeleteCategoryCommand(id), cancellationToken);

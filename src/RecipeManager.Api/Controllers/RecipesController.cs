@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RecipeManager.Application.Features.Recipes.Commands;
 using RecipeManager.Application.Features.Recipes.Queries;
@@ -10,9 +11,11 @@ namespace RecipeManager.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize]
 public class RecipesController(IMediator mediator) : ControllerBase
 {
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
@@ -27,6 +30,7 @@ public class RecipesController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new GetRecipeByIdQuery(id), cancellationToken);
@@ -34,10 +38,9 @@ public class RecipesController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] CreateRecipeRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Create([FromBody] CreateRecipeRequest request, CancellationToken cancellationToken)
     {
+        var userId = Guid.Parse(User.FindFirst("sub")!.Value);
         var id = await mediator.Send(
             new CreateRecipeCommand(
                 request.Title,
@@ -47,17 +50,14 @@ public class RecipesController(IMediator mediator) : ControllerBase
                 request.CookTimeMinutes,
                 request.Servings,
                 request.CategoryId,
-                request.UserId),
+                userId),
             cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(
-        Guid id,
-        [FromBody] UpdateRecipeRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateRecipeRequest request, CancellationToken cancellationToken)
     {
         await mediator.Send(
             new UpdateRecipeCommand(
@@ -80,13 +80,27 @@ public class RecipesController(IMediator mediator) : ControllerBase
         return NoContent();
     }
 
-    // -- Step management -- // 
+    // -- Image upload -- //
+
+    [HttpPost("{id:guid}/image")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> UploadImage(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { error = "A non-empty file is required." });
+
+        await using var stream = file.OpenReadStream();
+        var imageUrl = await mediator.Send(
+            new UploadRecipeImageCommand(id, stream, file.FileName, file.ContentType, file.Length),
+            cancellationToken);
+
+        return Ok(new { imageUrl });
+    }
+
+    // -- Step management -- //
 
     [HttpPost("{id:guid}/steps")]
-    public async Task<IActionResult> AppendStep(
-        Guid id,
-        [FromBody] AppendStepRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> AppendStep(Guid id, [FromBody] AppendStepRequest request, CancellationToken cancellationToken)
     {
         var step = await mediator.Send(
             new AppendRecipeStepCommand(id, request.Description),
@@ -95,10 +109,7 @@ public class RecipesController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("{id:guid}/steps/insert")]
-    public async Task<IActionResult> InsertStep(
-        Guid id,
-        [FromBody] InsertStepRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> InsertStep(Guid id, [FromBody] InsertStepRequest request, CancellationToken cancellationToken)
     {
         var step = await mediator.Send(
             new InsertRecipeStepCommand(id, request.AfterStepNumber, request.Description),
@@ -107,10 +118,7 @@ public class RecipesController(IMediator mediator) : ControllerBase
     }
 
     [HttpDelete("{id:guid}/steps/{stepNumber:int}")]
-    public async Task<IActionResult> RemoveStep(
-        Guid id,
-        int stepNumber,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> RemoveStep(Guid id, int stepNumber, CancellationToken cancellationToken)
     {
         await mediator.Send(new RemoveRecipeStepCommand(id, stepNumber), cancellationToken);
         return NoContent();
@@ -124,8 +132,7 @@ public record CreateRecipeRequest(
     int PrepTimeMinutes,
     int CookTimeMinutes,
     int Servings,
-    Guid CategoryId,
-    Guid UserId);
+    Guid CategoryId);
 
 public record UpdateRecipeRequest(
     string Title,
