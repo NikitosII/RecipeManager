@@ -8,6 +8,8 @@ public interface IIngredientRepository
 
     Task<Ingredient?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<Ingredient?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
+
     Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default);
 
     Task AddAsync(Ingredient ingredient, CancellationToken cancellationToken = default);

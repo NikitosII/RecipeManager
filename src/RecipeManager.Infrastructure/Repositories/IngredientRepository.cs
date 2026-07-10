@@ -13,6 +13,10 @@ public class IngredientRepository(RecipeDbContext context) : IIngredientReposito
     public async Task<Ingredient?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await context.Ingredients.FindAsync([id], cancellationToken);
 
+    public async Task<Ingredient?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+        => await context.Ingredients.FirstOrDefaultAsync(
+            i => i.Name.ToLower() == name.ToLower(), cancellationToken);
+
     public async Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default)
         => await context.Ingredients.AnyAsync(i => i.Name == name, cancellationToken);
 

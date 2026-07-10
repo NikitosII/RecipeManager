@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using RecipeManager.Application.Interfaces;
+using RecipeManager.Domain.Common;
 using RecipeManager.Domain.Entities;
 using RecipeManager.Infrastructure.Identity;
 
@@ -21,5 +22,14 @@ public class RecipeDbContext(DbContextOptions<RecipeDbContext> options)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RecipeDbContext).Assembly);
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                modelBuilder.Entity(entityType.ClrType)
+                    .Property(nameof(BaseEntity.Id))
+                    .ValueGeneratedNever();
+            }
+        }
     }
 }
