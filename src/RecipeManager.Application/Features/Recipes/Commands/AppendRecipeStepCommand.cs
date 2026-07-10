@@ -19,9 +19,7 @@ public class AppendRecipeStepCommandHandler(IRecipeRepository recipeRepository) 
 
         var step = recipe.AppendStep(request.Description.Trim());
 
-        recipeRepository.Update(recipe);
         await recipeRepository.SaveChangesAsync(cancellationToken);
-
         return new RecipeStepDto(step.Id, step.StepNumber, step.Description);
     }
 }

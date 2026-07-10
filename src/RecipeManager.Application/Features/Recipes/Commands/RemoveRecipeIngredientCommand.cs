@@ -4,16 +4,17 @@ using RecipeManager.Domain.Interfaces;
 
 namespace RecipeManager.Application.Features.Recipes.Commands;
 
-public record RemoveRecipeStepCommand(Guid RecipeId, int StepNumber) : IRequest;
+public record RemoveRecipeIngredientCommand(Guid RecipeId, Guid IngredientId) : IRequest;
 
-public class RemoveRecipeStepCommandHandler(IRecipeRepository recipeRepository) : IRequestHandler<RemoveRecipeStepCommand>
+public class RemoveRecipeIngredientCommandHandler(IRecipeRepository recipeRepository)
+    : IRequestHandler<RemoveRecipeIngredientCommand>
 {
-    public async Task Handle(RemoveRecipeStepCommand request, CancellationToken cancellationToken)
+    public async Task Handle(RemoveRecipeIngredientCommand request, CancellationToken cancellationToken)
     {
         var recipe = await recipeRepository.GetByIdWithDetailsAsync(request.RecipeId, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.RecipeId);
 
-        recipe.RemoveStep(request.StepNumber);
+        recipe.RemoveIngredient(request.IngredientId);
         await recipeRepository.SaveChangesAsync(cancellationToken);
     }
 }

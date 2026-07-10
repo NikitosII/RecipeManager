@@ -17,12 +17,9 @@ public class InsertRecipeStepCommandHandler(IRecipeRepository recipeRepository) 
         var recipe = await recipeRepository.GetByIdWithDetailsAsync(request.RecipeId, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.RecipeId);
 
-        // Domain method uses LinkedList traversal internally
         var step = recipe.InsertStepAfter(request.AfterStepNumber, request.Description.Trim());
 
-        recipeRepository.Update(recipe);
         await recipeRepository.SaveChangesAsync(cancellationToken);
-
         return new RecipeStepDto(step.Id, step.StepNumber, step.Description);
     }
 }
