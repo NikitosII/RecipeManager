@@ -123,6 +123,24 @@ public class RecipesController(IMediator mediator) : ControllerBase
         await mediator.Send(new RemoveRecipeStepCommand(id, stepNumber), cancellationToken);
         return NoContent();
     }
+
+    // -- Ingredient management -- //
+
+    [HttpPost("{id:guid}/ingredients")]
+    public async Task<IActionResult> AddIngredient(Guid id, [FromBody] AddIngredientRequest request, CancellationToken cancellationToken)
+    {
+        var ingredient = await mediator.Send(
+            new AddRecipeIngredientCommand(id, request.Name, request.Quantity, request.Unit),
+            cancellationToken);
+        return Ok(ingredient);
+    }
+
+    [HttpDelete("{id:guid}/ingredients/{ingredientId:guid}")]
+    public async Task<IActionResult> RemoveIngredient(Guid id, Guid ingredientId, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new RemoveRecipeIngredientCommand(id, ingredientId), cancellationToken);
+        return NoContent();
+    }
 }
 
 public record CreateRecipeRequest(
@@ -145,3 +163,5 @@ public record UpdateRecipeRequest(
 public record AppendStepRequest(string Description);
 
 public record InsertStepRequest(int AfterStepNumber, string Description);
+
+public record AddIngredientRequest(string Name, decimal Quantity, MeasurementUnit Unit);

@@ -6,6 +6,7 @@ using RecipeManager.Api.Middleware;
 using RecipeManager.Application;
 using RecipeManager.Application.Configuration;
 using RecipeManager.Infrastructure;
+using RecipeManager.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +53,15 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+const string SpaCorsPolicy = "SpaCors";
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                  ?? ["http://localhost:5173"];
+builder.Services.AddCors(options =>
+    options.AddPolicy(SpaCorsPolicy, policy =>
+        policy.WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()));
+
 builder.Services.AddOpenApi();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -60,11 +70,15 @@ builder.Services.AddProblemDetails();
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
+{
     app.MapOpenApi();
+    await DbSeeder.SeedAsync(app.Services);
+}
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseCors(SpaCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
