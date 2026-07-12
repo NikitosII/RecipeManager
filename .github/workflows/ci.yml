@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore RecipeManager.slnx
+
+      - name: Build
+        run: dotnet build RecipeManager.slnx -c Release --no-restore
+
+      # Integration tests spin up PostgreSQL via Testcontainers; Docker is
+      # preinstalled on the GitHub-hosted ubuntu runner.
+      - name: Test
+        run: dotnet test RecipeManager.slnx -c Release --no-build --verbosity normal
+
+  frontend:
+    name: Frontend (lint + test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Docker images (build only)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f src/RecipeManager.Api/Dockerfile -t recipemanager-api:ci .
+
+      - name: Build client image
+        run: docker build -t recipemanager-client:ci ./client

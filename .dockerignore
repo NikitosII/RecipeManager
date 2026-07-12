@@ -1,0 +1,13 @@
+# Keep the API build context small. The API Dockerfile only needs src/,
+# Directory.Packages.props and global.json.
+**/bin
+**/obj
+client
+tests
+node_modules
+.git
+.github
+.vs
+dist
+UI Design
+**/*.user
