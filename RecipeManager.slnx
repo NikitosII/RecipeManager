@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RecipeManager.Api/RecipeManager.Api.csproj" />
+    <Project Path="src/RecipeManager.Application/RecipeManager.Application.csproj" />
+    <Project Path="src/RecipeManager.Domain/RecipeManager.Domain.csproj" />
+    <Project Path="src/RecipeManager.Infrastructure/RecipeManager.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RecipeManager.Api.IntegrationTests/RecipeManager.Api.IntegrationTests.csproj" />
+    <Project Path="tests/RecipeManager.Application.UnitTests/RecipeManager.Application.UnitTests.csproj" />
+    <Project Path="tests/RecipeManager.Domain.UnitTests/RecipeManager.Domain.UnitTests.csproj" />
+  </Folder>
+</Solution>
