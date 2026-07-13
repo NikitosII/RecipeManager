@@ -12,4 +12,5 @@ public record RecipeSummaryDto(
     int Servings,
     string? ImageUrl,
     string CategoryName,
+    string AuthorName,
     DateTime DateCreated);

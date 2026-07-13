@@ -11,7 +11,7 @@ namespace RecipeManager.Application.Features.Recipes.Commands;
 /// Attaches an ingredient to a recipe from the free-text recipe editor.
 /// The ingredient is looked up by name and created on demand if it does not yet exist.
 /// </summary>
-public record AddRecipeIngredientCommand(Guid RecipeId, string IngredientName, decimal Quantity, MeasurementUnit Unit) : IRequest<RecipeIngredientDto>;
+public record AddRecipeIngredientCommand(Guid RecipeId, string IngredientName, decimal Quantity, MeasurementUnit Unit, Guid RequestingUserId) : IRequest<RecipeIngredientDto>;
 
 public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepository, IIngredientRepository ingredientRepository)
     : IRequestHandler<AddRecipeIngredientCommand, RecipeIngredientDto>
@@ -25,6 +25,8 @@ public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepositor
 
         var recipe = await recipeRepository.GetByIdWithDetailsAsync(request.RecipeId, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.RecipeId);
+
+        recipe.EnsureOwnedBy(request.RequestingUserId);
 
         var name = request.IngredientName.Trim();
         var ingredient = await ingredientRepository.GetByNameAsync(name, cancellationToken);

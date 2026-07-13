@@ -15,6 +15,9 @@ public interface IRecipeRepository
 
     Task<Recipe?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyDictionary<Guid, string>> GetAuthorNamesAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default);
+
     Task AddAsync(Recipe recipe, CancellationToken cancellationToken = default);
 
     void Update(Recipe recipe);

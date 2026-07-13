@@ -14,6 +14,8 @@ public class GetRecipeByIdQueryHandler(IRecipeRepository recipeRepository) : IRe
         var recipe = await recipeRepository.GetByIdWithDetailsAsync(request.Id, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.Id);
 
+        var authorNames = await recipeRepository.GetAuthorNamesAsync([recipe.UserId], cancellationToken);
+
         return new RecipeDetailDto(
             recipe.Id,
             recipe.Title,
@@ -26,6 +28,7 @@ public class GetRecipeByIdQueryHandler(IRecipeRepository recipeRepository) : IRe
             recipe.CategoryId,
             recipe.Category?.Name ?? string.Empty,
             recipe.UserId,
+            authorNames.GetValueOrDefault(recipe.UserId, "Unknown"),
             recipe.Steps.Select(s => new RecipeStepDto(s.Id, s.StepNumber, s.Description)).ToList(),
             recipe.RecipeIngredients.Select(ri => new RecipeIngredientDto(
                 ri.IngredientId,

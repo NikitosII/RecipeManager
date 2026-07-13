@@ -25,7 +25,7 @@ public class AddRecipeIngredientCommandTests
         _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
         _ingredients.GetByNameAsync("Salt", Arg.Any<CancellationToken>()).Returns(existing);
 
-        var command = new AddRecipeIngredientCommand(recipe.Id, "Salt", 2, MeasurementUnit.Pinch);
+        var command = new AddRecipeIngredientCommand(recipe.Id, "Salt", 2, MeasurementUnit.Pinch, recipe.UserId);
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         Assert.Equal(existing.Id, result.IngredientId);
@@ -43,7 +43,7 @@ public class AddRecipeIngredientCommandTests
         _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
         _ingredients.GetByNameAsync("Basil", Arg.Any<CancellationToken>()).Returns((Ingredient?)null);
 
-        var command = new AddRecipeIngredientCommand(recipe.Id, "  Basil  ", 1, MeasurementUnit.Tablespoon);
+        var command = new AddRecipeIngredientCommand(recipe.Id, "  Basil  ", 1, MeasurementUnit.Tablespoon, recipe.UserId);
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         // Name is trimmed before lookup/creation.
@@ -57,7 +57,7 @@ public class AddRecipeIngredientCommandTests
     [InlineData("   ")]
     public async Task Handle_BlankName_ThrowsValidation(string name)
     {
-        var command = new AddRecipeIngredientCommand(Guid.NewGuid(), name, 1, MeasurementUnit.Gram);
+        var command = new AddRecipeIngredientCommand(Guid.NewGuid(), name, 1, MeasurementUnit.Gram, Guid.NewGuid());
 
         await Assert.ThrowsAsync<ValidationException>(() => CreateHandler().Handle(command, CancellationToken.None));
     }
@@ -67,7 +67,7 @@ public class AddRecipeIngredientCommandTests
     [InlineData(-1)]
     public async Task Handle_NonPositiveQuantity_ThrowsValidation(int quantity)
     {
-        var command = new AddRecipeIngredientCommand(Guid.NewGuid(), "Sugar", quantity, MeasurementUnit.Gram);
+        var command = new AddRecipeIngredientCommand(Guid.NewGuid(), "Sugar", quantity, MeasurementUnit.Gram, Guid.NewGuid());
 
         await Assert.ThrowsAsync<ValidationException>(() => CreateHandler().Handle(command, CancellationToken.None));
     }
@@ -78,8 +78,21 @@ public class AddRecipeIngredientCommandTests
         var recipeId = Guid.NewGuid();
         _recipes.GetByIdWithDetailsAsync(recipeId, Arg.Any<CancellationToken>()).Returns((Recipe?)null);
 
-        var command = new AddRecipeIngredientCommand(recipeId, "Sugar", 1, MeasurementUnit.Gram);
+        var command = new AddRecipeIngredientCommand(recipeId, "Sugar", 1, MeasurementUnit.Gram, Guid.NewGuid());
 
         await Assert.ThrowsAsync<NotFoundException>(() => CreateHandler().Handle(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_RequestingUserIsNotOwner_ThrowsForbidden()
+    {
+        var recipe = NewRecipe();
+        _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
+
+        // A different user than the recipe's creator.
+        var command = new AddRecipeIngredientCommand(recipe.Id, "Sugar", 1, MeasurementUnit.Gram, Guid.NewGuid());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => CreateHandler().Handle(command, CancellationToken.None));
+        await _recipes.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

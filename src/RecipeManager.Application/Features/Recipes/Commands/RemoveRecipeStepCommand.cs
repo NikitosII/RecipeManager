@@ -4,7 +4,7 @@ using RecipeManager.Domain.Interfaces;
 
 namespace RecipeManager.Application.Features.Recipes.Commands;
 
-public record RemoveRecipeStepCommand(Guid RecipeId, int StepNumber) : IRequest;
+public record RemoveRecipeStepCommand(Guid RecipeId, int StepNumber, Guid RequestingUserId) : IRequest;
 
 public class RemoveRecipeStepCommandHandler(IRecipeRepository recipeRepository) : IRequestHandler<RemoveRecipeStepCommand>
 {
@@ -12,6 +12,8 @@ public class RemoveRecipeStepCommandHandler(IRecipeRepository recipeRepository) 
     {
         var recipe = await recipeRepository.GetByIdWithDetailsAsync(request.RecipeId, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.RecipeId);
+
+        recipe.EnsureOwnedBy(request.RequestingUserId);
 
         recipe.RemoveStep(request.StepNumber);
         await recipeRepository.SaveChangesAsync(cancellationToken);

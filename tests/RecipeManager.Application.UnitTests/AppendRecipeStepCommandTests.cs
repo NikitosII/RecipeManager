@@ -22,7 +22,7 @@ public class AppendRecipeStepCommandTests
         var recipe = NewRecipe();
         _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
 
-        var command = new AppendRecipeStepCommand(recipe.Id, "  Butter the bread  ");
+        var command = new AppendRecipeStepCommand(recipe.Id, "  Butter the bread  ", recipe.UserId);
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         Assert.Equal(1, result.StepNumber);
@@ -34,7 +34,7 @@ public class AppendRecipeStepCommandTests
     [Fact]
     public async Task Handle_BlankDescription_ThrowsValidation()
     {
-        var command = new AppendRecipeStepCommand(Guid.NewGuid(), "   ");
+        var command = new AppendRecipeStepCommand(Guid.NewGuid(), "   ", Guid.NewGuid());
 
         await Assert.ThrowsAsync<ValidationException>(() => CreateHandler().Handle(command, CancellationToken.None));
     }
@@ -45,8 +45,20 @@ public class AppendRecipeStepCommandTests
         var recipeId = Guid.NewGuid();
         _recipes.GetByIdWithDetailsAsync(recipeId, Arg.Any<CancellationToken>()).Returns((Recipe?)null);
 
-        var command = new AppendRecipeStepCommand(recipeId, "Do a thing");
+        var command = new AppendRecipeStepCommand(recipeId, "Do a thing", Guid.NewGuid());
 
         await Assert.ThrowsAsync<NotFoundException>(() => CreateHandler().Handle(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_RequestingUserIsNotOwner_ThrowsForbidden()
+    {
+        var recipe = NewRecipe();
+        _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
+
+        var command = new AppendRecipeStepCommand(recipe.Id, "Do a thing", Guid.NewGuid());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => CreateHandler().Handle(command, CancellationToken.None));
+        await _recipes.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

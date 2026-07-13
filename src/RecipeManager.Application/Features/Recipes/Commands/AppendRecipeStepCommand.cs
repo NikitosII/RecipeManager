@@ -5,7 +5,7 @@ using RecipeManager.Domain.Interfaces;
 
 namespace RecipeManager.Application.Features.Recipes.Commands;
 
-public record AppendRecipeStepCommand(Guid RecipeId, string Description) : IRequest<RecipeStepDto>;
+public record AppendRecipeStepCommand(Guid RecipeId, string Description, Guid RequestingUserId) : IRequest<RecipeStepDto>;
 
 public class AppendRecipeStepCommandHandler(IRecipeRepository recipeRepository) : IRequestHandler<AppendRecipeStepCommand, RecipeStepDto>
 {
@@ -16,6 +16,8 @@ public class AppendRecipeStepCommandHandler(IRecipeRepository recipeRepository) 
 
         var recipe = await recipeRepository.GetByIdWithDetailsAsync(request.RecipeId, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.RecipeId);
+
+        recipe.EnsureOwnedBy(request.RequestingUserId);
 
         var step = recipe.AppendStep(request.Description.Trim());
 

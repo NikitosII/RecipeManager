@@ -10,7 +10,8 @@ public record UploadRecipeImageCommand(
     Stream Content,
     string FileName,
     string ContentType,
-    long Length) : IRequest<string>;
+    long Length,
+    Guid RequestingUserId) : IRequest<string>;
 
 public class UploadRecipeImageCommandHandler(
     IRecipeRepository recipeRepository,
@@ -37,6 +38,8 @@ public class UploadRecipeImageCommandHandler(
 
         var recipe = await recipeRepository.GetByIdAsync(request.RecipeId, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.RecipeId);
+
+        recipe.EnsureOwnedBy(request.RequestingUserId);
 
         // Remove the previously stored image, if any, to avoid orphaned files.
         if (!string.IsNullOrEmpty(recipe.ImageUrl))

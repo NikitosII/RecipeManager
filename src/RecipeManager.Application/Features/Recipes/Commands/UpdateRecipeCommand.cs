@@ -12,7 +12,8 @@ public record UpdateRecipeCommand(
     DifficultyLevel DifficultyLevel,
     int PrepTimeMinutes,
     int CookTimeMinutes,
-    int Servings) : IRequest;
+    int Servings,
+    Guid RequestingUserId) : IRequest;
 
 public class UpdateRecipeCommandHandler(IRecipeRepository recipeRepository) : IRequestHandler<UpdateRecipeCommand>
 {
@@ -23,6 +24,8 @@ public class UpdateRecipeCommandHandler(IRecipeRepository recipeRepository) : IR
 
         var recipe = await recipeRepository.GetByIdAsync(request.Id, cancellationToken)
                      ?? throw new NotFoundException(nameof(Domain.Entities.Recipe), request.Id);
+
+        recipe.EnsureOwnedBy(request.RequestingUserId);
 
         recipe.Update(
             request.Title.Trim(),

@@ -20,6 +20,9 @@ public class GetRecipesQueryHandler(IRecipeRepository recipeRepository) : IReque
         var (items, total) = await recipeRepository.GetPagedAsync(
             page, pageSize, request.Search, request.CategoryId, cancellationToken);
 
+        var authorNames = await recipeRepository.GetAuthorNamesAsync(
+            items.Select(r => r.UserId).Distinct().ToList(), cancellationToken);
+
         var dtos = items.Select(r => new RecipeSummaryDto(
             r.Id,
             r.Title,
@@ -30,6 +33,7 @@ public class GetRecipesQueryHandler(IRecipeRepository recipeRepository) : IReque
             r.Servings,
             r.ImageUrl,
             r.Category?.Name ?? string.Empty,
+            authorNames.GetValueOrDefault(r.UserId, "Unknown"),
             r.DateCreated)).ToList();
 
         return new PaginatedResponse<RecipeSummaryDto>(dtos, page, pageSize, total);

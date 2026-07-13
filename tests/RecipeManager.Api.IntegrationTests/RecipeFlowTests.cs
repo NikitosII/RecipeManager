@@ -12,7 +12,8 @@ public class RecipeFlowTests(ApiFactory factory)
     public async Task Create_Recipe_RequiresAuthentication()
     {
         var client = factory.CreateClient();
-        var categoryId = await client.FirstCategoryIdAsync();
+        // No auth, so the request is rejected before the category is ever looked up.
+        var categoryId = Guid.NewGuid();
 
         var response = await client.PostAsJsonAsync("/api/v1/recipes", new
         {
@@ -32,7 +33,7 @@ public class RecipeFlowTests(ApiFactory factory)
     public async Task FullRecipeLifecycle_CreateAddStepsAndIngredients_Persists()
     {
         var (client, _) = await factory.AuthenticatedClientAsync();
-        var categoryId = await client.FirstCategoryIdAsync();
+        var categoryId = await client.CreateCategoryAsync();
 
         // Create
         var createResponse = await client.PostAsJsonAsync("/api/v1/recipes", new
@@ -80,7 +81,7 @@ public class RecipeFlowTests(ApiFactory factory)
     public async Task AddingStepToPersistedRecipe_DoesNotThrowConcurrency()
     {
         var (client, _) = await factory.AuthenticatedClientAsync();
-        var categoryId = await client.FirstCategoryIdAsync();
+        var categoryId = await client.CreateCategoryAsync();
 
         var createResponse = await client.PostAsJsonAsync("/api/v1/recipes", new
         {
@@ -106,7 +107,7 @@ public class RecipeFlowTests(ApiFactory factory)
     public async Task GetRecipes_ReturnsPaginatedResults()
     {
         var (client, _) = await factory.AuthenticatedClientAsync();
-        var categoryId = await client.FirstCategoryIdAsync();
+        var categoryId = await client.CreateCategoryAsync();
         await client.PostAsJsonAsync("/api/v1/recipes", new
         {
             title = "Listed Recipe",
@@ -126,6 +127,42 @@ public class RecipeFlowTests(ApiFactory factory)
         var page = await response.Content.ReadFromJsonAsync<PagedResult>();
         Assert.NotNull(page);
         Assert.True(page!.TotalCount >= 1);
+    }
+
+    [Fact]
+    public async Task Delete_Recipe_OnlyOwnerCanDelete()
+    {
+        // Owner creates a recipe.
+        var (owner, _) = await factory.AuthenticatedClientAsync();
+        var categoryId = await owner.CreateCategoryAsync();
+        var createResponse = await owner.PostAsJsonAsync("/api/v1/recipes", new
+        {
+            title = "Owned Recipe",
+            description = (string?)null,
+            difficultyLevel = DifficultyLevel.Easy,
+            prepTimeMinutes = 5,
+            cookTimeMinutes = 5,
+            servings = 2,
+            categoryId
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedIdResponse>();
+        var recipeId = created!.Id;
+
+        // A different authenticated user may not delete it.
+        var (stranger, _) = await factory.AuthenticatedClientAsync();
+        var forbidden = await stranger.DeleteAsync($"/api/v1/recipes/{recipeId}");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        // The recipe still exists.
+        var stillThere = await owner.GetAsync($"/api/v1/recipes/{recipeId}");
+        Assert.Equal(HttpStatusCode.OK, stillThere.StatusCode);
+
+        // The owner can delete it.
+        var deleted = await owner.DeleteAsync($"/api/v1/recipes/{recipeId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        var gone = await owner.GetAsync($"/api/v1/recipes/{recipeId}");
+        Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
     }
 
     private record PagedResult(int Page, int PageSize, int TotalCount, int TotalPages);

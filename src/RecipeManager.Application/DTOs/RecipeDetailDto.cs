@@ -14,6 +14,7 @@ public record RecipeDetailDto(
     Guid CategoryId,
     string CategoryName,
     Guid UserId,
+    string AuthorName,
     IReadOnlyList<RecipeStepDto> Steps,
     IReadOnlyList<RecipeIngredientDto> Ingredients,
     DateTime DateCreated,

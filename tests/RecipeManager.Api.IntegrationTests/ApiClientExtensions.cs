@@ -34,12 +34,16 @@ internal static class ApiClientExtensions
         return (client, auth);
     }
 
-    public static async Task<Guid> FirstCategoryIdAsync(this HttpClient client)
+    /// <summary>
+    /// Creates a category with a unique name/slug and returns its id.
+    /// </summary>
+    public static async Task<Guid> CreateCategoryAsync(this HttpClient client)
     {
-        var categories = await client.GetFromJsonAsync<List<CategoryDto>>("/api/v1/categories");
-        Assert.NotNull(categories);
-        Assert.NotEmpty(categories);
-        return categories[0].Id;
+        var slug = $"cat-{Guid.NewGuid():N}";
+        var response = await client.PostAsJsonAsync("/api/v1/categories", new { name = slug, slug });
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<CreatedIdResponse>();
+        return created!.Id;
     }
 }
 

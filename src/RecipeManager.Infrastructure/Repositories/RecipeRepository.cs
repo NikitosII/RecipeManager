@@ -48,6 +48,18 @@ public class RecipeRepository(RecipeDbContext context) : IRecipeRepository
                 .ThenInclude(ri => ri.Ingredient)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetAuthorNamesAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        if (userIds.Count == 0)
+            return new Dictionary<Guid, string>();
+
+        return await context.Users
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FirstName, u.LastName })
+            .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), cancellationToken);
+    }
+
     public async Task AddAsync(Recipe recipe, CancellationToken cancellationToken = default)
         => await context.Recipes.AddAsync(recipe, cancellationToken);
 

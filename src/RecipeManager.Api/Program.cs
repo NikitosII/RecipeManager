@@ -72,7 +72,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    await DbSeeder.SeedAsync(app.Services);
+    await DbInitializer.InitializeAsync(app.Services);
 }
 
 app.UseExceptionHandler();
