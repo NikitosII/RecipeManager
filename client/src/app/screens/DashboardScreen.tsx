@@ -5,24 +5,41 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  FolderPlus,
   Heart,
   LogOut,
   Plus,
   Search,
   Settings,
   SlidersHorizontal,
+  Trash2,
   User,
   Utensils,
 } from 'lucide-react'
 import { useCategories } from '@/hooks/use-catalog'
 import { useRecipes } from '@/hooks/use-recipes'
+import { useFavorites, useToggleFavorite } from '@/hooks/use-favorites'
+import {
+  useCollection,
+  useCollections,
+  useCreateCollection,
+  useDeleteCollection,
+  useRemoveRecipeFromCollection,
+} from '@/hooks/use-collections'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useAuthStore } from '@/stores/auth-store'
+import type { RecipeSummary } from '@/types/api'
 import { categoryVisual } from '../components/category-config'
 import { RecipeCard } from '../components/RecipeCard'
 import { SkeletonCard } from '../components/ui-bits'
 
 const PAGE_SIZE = 9
+
+type View =
+  | { kind: 'recipes' }
+  | { kind: 'favorites' }
+  | { kind: 'collections' }
+  | { kind: 'collection'; id: string; name: string }
 
 export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => void; onCreate: () => void }) {
   const logout = useAuthStore((s) => s.logout)
@@ -30,24 +47,32 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
   const initials =
     (user ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() : '') || '?'
 
+  const [view, setView] = useState<View>({ kind: 'recipes' })
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [favPage, setFavPage] = useState(1)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const debouncedSearch = useDebouncedValue(search)
+  const toggleFavorite = useToggleFavorite()
+  const onToggleFavorite = (recipe: RecipeSummary) =>
+    toggleFavorite.mutate({ recipeId: recipe.id, isFavorite: recipe.isFavorite })
 
   const { data: categories = [] } = useCategories()
+  const { data: collections = [] } = useCollections()
   const { data, isFetching } = useRecipes({
     page,
     pageSize: PAGE_SIZE,
     search: debouncedSearch.trim() || undefined,
     categoryId: activeCategoryId ?? undefined,
   })
+  const { data: favData, isFetching: favFetching } = useFavorites({ page: favPage, pageSize: PAGE_SIZE })
 
   const recipes = data?.items ?? []
   const totalPages = data?.totalPages ?? 1
   const totalCount = data?.totalCount ?? 0
+  const favCount = favData?.totalCount ?? 0
   const allCount = useMemo(() => categories.reduce((sum, c) => sum + c.recipeCount, 0), [categories])
 
   const activeCategoryName = activeCategoryId
@@ -57,6 +82,7 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
   const selectCategory = (id: string | null) => {
     setActiveCategoryId(id)
     setPage(1)
+    setView({ kind: 'recipes' })
   }
 
   return (
@@ -84,7 +110,7 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
 
           <CategoryButton
             label="All"
-            active={activeCategoryId === null}
+            active={view.kind === 'recipes' && activeCategoryId === null}
             count={allCount}
             onClick={() => selectCategory(null)}
           />
@@ -92,7 +118,7 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
             <CategoryButton
               key={cat.id}
               label={cat.name}
-              active={activeCategoryId === cat.id}
+              active={view.kind === 'recipes' && activeCategoryId === cat.id}
               count={cat.recipeCount}
               onClick={() => selectCategory(cat.id)}
             />
@@ -101,21 +127,20 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-2 pt-5 pb-1">
             Library
           </p>
-          {[
-            { icon: <Heart size={15} />, label: 'Favourites', count: 0 },
-            { icon: <Bookmark size={15} />, label: 'Collections', count: 3 },
-          ].map((item) => (
-            <button
-              key={item.label}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-[#2C1A0E] hover:bg-sidebar-accent transition-all"
-            >
-              <span className="text-muted-foreground">{item.icon}</span>
-              {item.label}
-              <span className="ml-auto text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5">
-                {item.count}
-              </span>
-            </button>
-          ))}
+          <LibraryButton
+            icon={<Heart size={15} />}
+            label="Favourites"
+            count={favCount}
+            active={view.kind === 'favorites'}
+            onClick={() => setView({ kind: 'favorites' })}
+          />
+          <LibraryButton
+            icon={<Bookmark size={15} />}
+            label="Collections"
+            count={collections.length}
+            active={view.kind === 'collections' || view.kind === 'collection'}
+            onClick={() => setView({ kind: 'collections' })}
+          />
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">
@@ -132,18 +157,22 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-sm border-b border-border px-6 py-3.5 flex items-center gap-4">
-          <div className="flex-1 relative max-w-sm">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
-              placeholder="Search recipes…"
-              className="w-full pl-9 pr-4 py-2 bg-input-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D94F3A]/25 focus:border-[#D94F3A] transition-all"
-            />
-          </div>
+          {view.kind === 'recipes' ? (
+            <div className="flex-1 relative max-w-sm">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search recipes…"
+                className="w-full pl-9 pr-4 py-2 bg-input-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D94F3A]/25 focus:border-[#D94F3A] transition-all"
+              />
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
 
           <div className="flex items-center gap-2 ml-auto">
             <button
@@ -197,70 +226,349 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
         </header>
 
         <main className="flex-1 p-6">
-          <div className="mb-6 flex items-end justify-between">
-            <div>
-              <h1
-                className="text-2xl font-semibold text-[#2C1A0E]"
-                style={{ fontFamily: "'Playfair Display', serif" }}
-              >
-                {activeCategoryId === null ? 'All Recipes' : activeCategoryName}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {totalCount} {totalCount === 1 ? 'recipe' : 'recipes'} found
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <SlidersHorizontal size={14} />
-              <span className="text-xs">Filter</span>
-            </div>
-          </div>
+          {view.kind === 'recipes' && (
+            <>
+              <SectionHeading
+                title={activeCategoryId === null ? 'All Recipes' : activeCategoryName}
+                subtitle={`${totalCount} ${totalCount === 1 ? 'recipe' : 'recipes'} found`}
+                showFilter
+              />
+              <RecipeGrid
+                recipes={recipes}
+                isFetching={isFetching}
+                onOpen={onOpen}
+                onToggleFavorite={onToggleFavorite}
+                emptyTitle="No recipes found"
+                emptySubtitle="Try a different search or category, or create the first one"
+              />
+              <Pager page={page} totalPages={totalPages} onPage={setPage} />
+            </>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {isFetching && recipes.length === 0 ? (
-              Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-            ) : recipes.length > 0 ? (
-              recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onOpen={() => onOpen(recipe.id)} />)
-            ) : (
-              <div className="col-span-full text-center py-20 text-muted-foreground">
-                <Utensils size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No recipes found</p>
-                <p className="text-sm mt-1">Try a different search or category, or create the first one</p>
-              </div>
-            )}
-          </div>
+          {view.kind === 'favorites' && (
+            <>
+              <SectionHeading
+                title="Favourites"
+                subtitle={`${favCount} ${favCount === 1 ? 'recipe' : 'recipes'} you love`}
+              />
+              <RecipeGrid
+                recipes={favData?.items ?? []}
+                isFetching={favFetching}
+                onOpen={onOpen}
+                onToggleFavorite={onToggleFavorite}
+                emptyIcon={<Heart size={40} className="mx-auto mb-3 opacity-30" />}
+                emptyTitle="No favourites yet"
+                emptySubtitle="Tap the heart on any recipe to save it here"
+              />
+              <Pager page={favPage} totalPages={favData?.totalPages ?? 1} onPage={setFavPage} />
+            </>
+          )}
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-10">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={15} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                    p === page ? 'bg-[#D94F3A] text-white' : 'border border-border text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
+          {view.kind === 'collections' && (
+            <CollectionsView onOpenCollection={(id, name) => setView({ kind: 'collection', id, name })} />
+          )}
+
+          {view.kind === 'collection' && (
+            <CollectionDetailView
+              collectionId={view.id}
+              onBack={() => setView({ kind: 'collections' })}
+              onOpenRecipe={onOpen}
+              onToggleFavorite={onToggleFavorite}
+            />
           )}
         </main>
       </div>
     </div>
+  )
+}
+
+function SectionHeading({ title, subtitle, showFilter }: { title: string; subtitle: string; showFilter?: boolean }) {
+  return (
+    <div className="mb-6 flex items-end justify-between">
+      <div>
+        <h1 className="text-2xl font-semibold text-[#2C1A0E]" style={{ fontFamily: "'Playfair Display', serif" }}>
+          {title}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
+      </div>
+      {showFilter && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <SlidersHorizontal size={14} />
+          <span className="text-xs">Filter</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RecipeGrid({
+  recipes,
+  isFetching,
+  onOpen,
+  onToggleFavorite,
+  emptyTitle,
+  emptySubtitle,
+  emptyIcon,
+}: {
+  recipes: RecipeSummary[]
+  isFetching: boolean
+  onOpen: (id: string) => void
+  onToggleFavorite: (recipe: RecipeSummary) => void
+  emptyTitle: string
+  emptySubtitle: string
+  emptyIcon?: React.ReactNode
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      {isFetching && recipes.length === 0 ? (
+        Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+      ) : recipes.length > 0 ? (
+        recipes.map((recipe) => (
+          <RecipeCard
+            key={recipe.id}
+            recipe={recipe}
+            onOpen={() => onOpen(recipe.id)}
+            onToggleFavorite={onToggleFavorite}
+          />
+        ))
+      ) : (
+        <div className="col-span-full text-center py-20 text-muted-foreground">
+          {emptyIcon ?? <Utensils size={40} className="mx-auto mb-3 opacity-30" />}
+          <p className="font-medium">{emptyTitle}</p>
+          <p className="text-sm mt-1">{emptySubtitle}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Pager({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-center gap-2 mt-10">
+      <button
+        onClick={() => onPage(Math.max(1, page - 1))}
+        disabled={page === 1}
+        className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronLeft size={15} />
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <button
+          key={p}
+          onClick={() => onPage(p)}
+          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+            p === page ? 'bg-[#D94F3A] text-white' : 'border border-border text-muted-foreground hover:bg-muted'
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => onPage(Math.min(totalPages, page + 1))}
+        disabled={page === totalPages}
+        className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        <ChevronRight size={15} />
+      </button>
+    </div>
+  )
+}
+
+function CollectionsView({ onOpenCollection }: { onOpenCollection: (id: string, name: string) => void }) {
+  const { data: collections = [], isLoading } = useCollections()
+  const createCollection = useCreateCollection()
+  const deleteCollection = useDeleteCollection()
+
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+
+  const handleCreate = () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    createCollection.mutate(
+      { name: trimmed, description: null },
+      {
+        onSuccess: () => {
+          setName('')
+          setCreating(false)
+        },
+      },
+    )
+  }
+
+  const handleDelete = (id: string, collectionName: string) => {
+    if (!window.confirm(`Delete the collection “${collectionName}”? The recipes themselves are not deleted.`)) return
+    deleteCollection.mutate(id)
+  }
+
+  return (
+    <>
+      <div className="mb-6 flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#2C1A0E]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Collections
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {collections.length} {collections.length === 1 ? 'collection' : 'collections'}
+          </p>
+        </div>
+        <button
+          onClick={() => setCreating((c) => !c)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#D94F3A] text-white rounded-xl text-sm font-medium hover:bg-[#C0392B] transition-colors"
+        >
+          <FolderPlus size={15} />
+          New collection
+        </button>
+      </div>
+
+      {creating && (
+        <div className="mb-6 flex items-center gap-2 max-w-md">
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate()
+              if (e.key === 'Escape') setCreating(false)
+            }}
+            placeholder="Collection name"
+            className="flex-1 px-3.5 py-2 bg-input-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D94F3A]/25 focus:border-[#D94F3A]"
+          />
+          <button
+            onClick={handleCreate}
+            disabled={!name.trim() || createCollection.isPending}
+            className="px-4 py-2 rounded-xl bg-[#D94F3A] text-white text-sm font-medium hover:bg-[#C0392B] transition-colors disabled:opacity-50"
+          >
+            Create
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : collections.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {collections.map((c) => (
+            <div
+              key={c.id}
+              onClick={() => onOpenCollection(c.id, c.name)}
+              className="bg-white rounded-2xl border border-border p-5 cursor-pointer group transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-[rgba(44,26,14,0.08)]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-[#D94F3A]">
+                  <Bookmark size={18} />
+                </div>
+                <button
+                  aria-label="Delete collection"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(c.id, c.name)
+                  }}
+                  className="p-1.5 rounded-lg text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition-all"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+              <h3
+                className="font-semibold text-[#2C1A0E] text-base mt-3 leading-snug"
+                style={{ fontFamily: "'Playfair Display', serif" }}
+              >
+                {c.name}
+              </h3>
+              {c.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.description}</p>}
+              <p className="text-xs text-muted-foreground mt-3">
+                {c.recipeCount} {c.recipeCount === 1 ? 'recipe' : 'recipes'}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 text-muted-foreground">
+          <Bookmark size={40} className="mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No collections yet</p>
+          <p className="text-sm mt-1">Create a collection to group recipes however you like</p>
+        </div>
+      )}
+    </>
+  )
+}
+
+function CollectionDetailView({
+  collectionId,
+  onBack,
+  onOpenRecipe,
+  onToggleFavorite,
+}: {
+  collectionId: string
+  onBack: () => void
+  onOpenRecipe: (id: string) => void
+  onToggleFavorite: (recipe: RecipeSummary) => void
+}) {
+  const { data: collection, isLoading, isError } = useCollection(collectionId)
+  const removeRecipe = useRemoveRecipeFromCollection()
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (isError || !collection)
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        <p className="font-medium text-[#2C1A0E]">This collection could not be loaded.</p>
+        <button onClick={onBack} className="mt-3 text-sm text-[#D94F3A] font-medium hover:underline">
+          Back to collections
+        </button>
+      </div>
+    )
+
+  const recipes = collection.recipes
+
+  return (
+    <>
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-[#2C1A0E] transition-colors mb-4"
+      >
+        <ChevronLeft size={15} />
+        Collections
+      </button>
+
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-[#2C1A0E]" style={{ fontFamily: "'Playfair Display', serif" }}>
+          {collection.name}
+        </h1>
+        {collection.description && <p className="text-sm text-muted-foreground mt-1">{collection.description}</p>}
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'}
+        </p>
+      </div>
+
+      {recipes.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {recipes.map((recipe) => (
+            <div key={recipe.id} className="relative group">
+              <RecipeCard
+                recipe={recipe}
+                onOpen={() => onOpenRecipe(recipe.id)}
+                onToggleFavorite={onToggleFavorite}
+              />
+              <button
+                aria-label="Remove from collection"
+                onClick={() => removeRecipe.mutate({ collectionId, recipeId: recipe.id })}
+                disabled={removeRecipe.isPending}
+                className="absolute top-3 left-3 p-1.5 rounded-full bg-white/90 text-[#8C6F5E] backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 text-muted-foreground">
+          <Bookmark size={40} className="mx-auto mb-3 opacity-30" />
+          <p className="font-medium">This collection is empty</p>
+          <p className="text-sm mt-1">Open a recipe and use “Save to Collection” to add it here</p>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -280,6 +588,39 @@ function CategoryButton({
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+        active ? 'bg-[#D94F3A] text-white shadow-sm' : 'text-[#2C1A0E] hover:bg-sidebar-accent'
+      }`}
+    >
+      <span className={active ? 'text-white' : 'text-muted-foreground'}>{icon}</span>
+      {label}
+      <span
+        className={`ml-auto text-xs rounded-full px-1.5 py-0.5 ${
+          active ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  )
+}
+
+function LibraryButton({
+  icon,
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
         active ? 'bg-[#D94F3A] text-white shadow-sm' : 'text-[#2C1A0E] hover:bg-sidebar-accent'
       }`}
     >

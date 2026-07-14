@@ -1,11 +1,30 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Bookmark, Check, CircleCheck, Clock, Flame, Heart, Pencil, Trash2, User, Users, Utensils } from 'lucide-react'
+import {
+  ArrowLeft,
+  Bookmark,
+  Check,
+  CircleCheck,
+  Clock,
+  Flame,
+  FolderPlus,
+  Heart,
+  Pencil,
+  Plus,
+  Trash2,
+  User,
+  Users,
+  Utensils,
+} from 'lucide-react'
 import { useDeleteRecipe, useRecipe } from '@/hooks/use-recipes'
+import { useToggleFavorite } from '@/hooks/use-favorites'
+import { useAddRecipeToCollection, useCollections, useCreateCollection } from '@/hooks/use-collections'
+import { useRateRecipe, useRemoveRating } from '@/hooks/use-ratings'
 import { useAuthStore } from '@/stores/auth-store'
 import { resolveMediaUrl } from '@/config'
 import { MeasurementUnitLabel } from '@/types/api'
-import { decorationFor, PLACEHOLDER_NUTRITION } from '../placeholders'
-import { CategoryBadge, StarRating } from '../components/ui-bits'
+import type { RecipeDetail } from '@/types/api'
+import { PLACEHOLDER_NUTRITION } from '../placeholders'
+import { CategoryBadge, RatingStars, RatingSummary } from '../components/ui-bits'
 
 export function DetailScreen({
   recipeId,
@@ -19,11 +38,12 @@ export function DetailScreen({
   const { data: recipe, isLoading, isError } = useRecipe(recipeId)
   const currentUser = useAuthStore((s) => s.user)
   const deleteRecipe = useDeleteRecipe()
+  const toggleFavorite = useToggleFavorite()
+  const rateRecipe = useRateRecipe()
+  const removeRating = useRemoveRating()
 
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(new Set())
   const [activeStep, setActiveStep] = useState(0)
-  const [saved, setSaved] = useState(false)
-  const [favorite, setFavorite] = useState(false)
 
   const steps = useMemo(
     () => (recipe ? [...recipe.steps].sort((a, b) => a.stepNumber - b.stepNumber) : []),
@@ -52,7 +72,6 @@ export function DetailScreen({
     )
   }
 
-  const deco = decorationFor(recipe.id)
   const image = resolveMediaUrl(recipe.imageUrl)
   const isOwner = Boolean(currentUser) && currentUser!.userId === recipe.userId
 
@@ -92,12 +111,14 @@ export function DetailScreen({
         </button>
 
         <button
-          onClick={() => setFavorite((f) => !f)}
-          className={`absolute top-5 right-5 p-2.5 rounded-xl backdrop-blur-sm transition-colors ${
-            favorite ? 'bg-[#D94F3A] text-white' : 'bg-white/15 text-white hover:bg-white/25'
+          aria-label={recipe.isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+          onClick={() => toggleFavorite.mutate({ recipeId: recipe.id, isFavorite: recipe.isFavorite })}
+          disabled={toggleFavorite.isPending}
+          className={`absolute top-5 right-5 p-2.5 rounded-xl backdrop-blur-sm transition-colors disabled:opacity-60 ${
+            recipe.isFavorite ? 'bg-[#D94F3A] text-white' : 'bg-white/15 text-white hover:bg-white/25'
           }`}
         >
-          <Heart size={16} fill={favorite ? 'currentColor' : 'none'} />
+          <Heart size={16} fill={recipe.isFavorite ? 'currentColor' : 'none'} />
         </button>
 
         <div className="absolute bottom-0 left-0 right-0 p-7">
@@ -124,7 +145,7 @@ export function DetailScreen({
             <span className="flex items-center gap-1">
               <Users size={13} /> {recipe.servings} servings
             </span>
-            <StarRating rating={deco.rating} />
+            <RatingSummary average={recipe.averageRating} count={recipe.ratingCount} light />
           </div>
         </div>
       </div>
@@ -208,22 +229,46 @@ export function DetailScreen({
 
         {/* Right — ingredients + nutrition */}
         <div className="space-y-6 lg:sticky lg:top-6 self-start">
-          <button
-            onClick={() => setSaved(!saved)}
-            className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-200 ${
-              saved ? 'bg-[#2C1A0E] text-white' : 'bg-[#D94F3A] text-white hover:bg-[#C0392B]'
-            }`}
-          >
-            {saved ? (
-              <>
-                <Bookmark size={16} fill="currentColor" /> Saved to Collection
-              </>
-            ) : (
-              <>
-                <Bookmark size={16} /> Save to Collection
-              </>
-            )}
-          </button>
+          <AddToCollectionMenu recipe={recipe} />
+
+          {/* Ratings */}
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <h3
+              className="font-semibold text-[#2C1A0E] mb-3 text-base"
+              style={{ fontFamily: "'Playfair Display', serif" }}
+            >
+              Rating
+            </h3>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-[#2C1A0E]" style={{ fontFamily: "'Playfair Display', serif" }}>
+                {recipe.ratingCount > 0 ? recipe.averageRating.toFixed(1) : '—'}
+              </span>
+              <span className="text-sm text-muted-foreground">/ 5</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-4">
+              {recipe.ratingCount} {recipe.ratingCount === 1 ? 'rating' : 'ratings'}
+            </p>
+
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">
+              {recipe.userRating ? 'Your rating' : 'Rate this recipe'}
+            </p>
+            <div className="flex items-center justify-between">
+              <RatingStars
+                value={recipe.userRating}
+                onRate={(value) => rateRecipe.mutate({ recipeId: recipe.id, value })}
+                disabled={rateRecipe.isPending || removeRating.isPending}
+              />
+              {recipe.userRating != null && (
+                <button
+                  onClick={() => removeRating.mutate(recipe.id)}
+                  disabled={removeRating.isPending}
+                  className="text-xs text-muted-foreground hover:text-[#D94F3A] transition-colors disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
 
           {isOwner && (
             <>
@@ -320,6 +365,118 @@ export function DetailScreen({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function AddToCollectionMenu({ recipe }: { recipe: RecipeDetail }) {
+  const { data: collections = [], isLoading } = useCollections()
+  const addRecipe = useAddRecipeToCollection()
+  const createCollection = useCreateCollection()
+
+  const [open, setOpen] = useState(false)
+  const [added, setAdded] = useState<Set<string>>(new Set())
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+
+  const markAdded = (collectionId: string) =>
+    setAdded((prev) => new Set(prev).add(collectionId))
+
+  const handleAdd = (collectionId: string) => {
+    if (added.has(collectionId)) return
+    addRecipe.mutate(
+      { collectionId, recipeId: recipe.id },
+      { onSuccess: () => markAdded(collectionId) },
+    )
+  }
+
+  const handleCreate = async () => {
+    const name = newName.trim()
+    if (!name) return
+    const id = await createCollection.mutateAsync({ name, description: null })
+    await addRecipe.mutateAsync({ collectionId: id, recipeId: recipe.id })
+    markAdded(id)
+    setNewName('')
+    setCreating(false)
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-sm bg-[#D94F3A] text-white hover:bg-[#C0392B] transition-colors"
+      >
+        <Bookmark size={16} /> Save to Collection
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-2 w-full bg-white rounded-2xl border border-border shadow-lg p-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-2 pt-1 pb-1.5">
+            Your collections
+          </p>
+
+          {isLoading ? (
+            <p className="px-2 py-2 text-sm text-muted-foreground">Loading…</p>
+          ) : collections.length > 0 ? (
+            <div className="max-h-52 overflow-y-auto space-y-0.5">
+              {collections.map((c) => {
+                const isAdded = added.has(c.id)
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleAdd(c.id)}
+                    disabled={isAdded || addRecipe.isPending}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm text-left text-[#2C1A0E] hover:bg-muted transition-colors disabled:cursor-default"
+                  >
+                    <Bookmark size={14} className="text-muted-foreground flex-shrink-0" />
+                    <span className="flex-1 truncate">{c.name}</span>
+                    {isAdded ? (
+                      <Check size={14} className="text-green-600" />
+                    ) : (
+                      <Plus size={14} className="text-muted-foreground" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="px-2 py-2 text-sm text-muted-foreground">No collections yet.</p>
+          )}
+
+          <div className="border-t border-border mt-1.5 pt-1.5">
+            {creating ? (
+              <div className="flex items-center gap-1.5 px-1">
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleCreate()
+                    if (e.key === 'Escape') setCreating(false)
+                  }}
+                  placeholder="Collection name"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 bg-input-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#D94F3A]/25"
+                />
+                <button
+                  onClick={() => void handleCreate()}
+                  disabled={!newName.trim() || createCollection.isPending}
+                  className="px-3 py-1.5 rounded-lg bg-[#D94F3A] text-white text-sm font-medium hover:bg-[#C0392B] transition-colors disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCreating(true)}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm text-left font-medium text-[#D94F3A] hover:bg-rose-50 transition-colors"
+              >
+                <FolderPlus size={15} />
+                New collection
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -68,6 +68,10 @@ export interface RecipeSummary {
   imageUrl: string | null
   categoryName: string
   authorName: string
+  isFavorite: boolean
+  averageRating: number
+  ratingCount: number
+  userRating: number | null
   dateCreated: string
 }
 
@@ -107,6 +111,10 @@ export interface RecipeDetail {
   categoryName: string
   userId: string
   authorName: string
+  isFavorite: boolean
+  averageRating: number
+  ratingCount: number
+  userRating: number | null
   steps: RecipeStep[]
   ingredients: RecipeIngredient[]
   dateCreated: string
@@ -123,6 +131,22 @@ export interface Category {
 export interface Ingredient {
   id: string
   name: string
+}
+
+export interface Collection {
+  id: string
+  name: string
+  description: string | null
+  recipeCount: number
+  dateCreated: string
+}
+
+export interface CollectionDetail {
+  id: string
+  name: string
+  description: string | null
+  dateCreated: string
+  recipes: RecipeSummary[]
 }
 
 export interface AuthResponse {

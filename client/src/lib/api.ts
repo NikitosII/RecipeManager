@@ -2,6 +2,8 @@ import { apiClient } from '@/lib/api-client'
 import type {
   AuthResponse,
   Category,
+  Collection,
+  CollectionDetail,
   Ingredient,
   MeasurementUnit,
   Paginated,
@@ -86,6 +88,11 @@ export const recipesApi = {
 
   delete: (id: string) => apiClient.delete(`/recipes/${id}`).then(() => undefined),
 
+  rate: (id: string, value: number) =>
+    apiClient.put(`/recipes/${id}/rating`, { value }).then(() => undefined),
+
+  removeRating: (id: string) => apiClient.delete(`/recipes/${id}/rating`).then(() => undefined),
+
   appendStep: (id: string, description: string) =>
     apiClient.post<RecipeStep>(`/recipes/${id}/steps`, { description }).then((r) => r.data),
 
@@ -101,6 +108,39 @@ export const recipesApi = {
       })
       .then((r) => r.data.imageUrl)
   },
+}
+
+// -- Favourites -- //
+
+export const favoritesApi = {
+  list: (params: { page?: number; pageSize?: number }) =>
+    apiClient.get<Paginated<RecipeSummary>>('/favorites', { params }).then((r) => r.data),
+
+  add: (recipeId: string) => apiClient.put(`/favorites/${recipeId}`).then(() => undefined),
+
+  remove: (recipeId: string) => apiClient.delete(`/favorites/${recipeId}`).then(() => undefined),
+}
+
+// -- Collections -- //
+
+export const collectionsApi = {
+  list: () => apiClient.get<Collection[]>('/collections').then((r) => r.data),
+
+  getById: (id: string) => apiClient.get<CollectionDetail>(`/collections/${id}`).then((r) => r.data),
+
+  create: (body: { name: string; description: string | null }) =>
+    apiClient.post<{ id: string }>('/collections', body).then((r) => r.data.id),
+
+  update: (id: string, body: { name: string; description: string | null }) =>
+    apiClient.put(`/collections/${id}`, body).then(() => undefined),
+
+  delete: (id: string) => apiClient.delete(`/collections/${id}`).then(() => undefined),
+
+  addRecipe: (collectionId: string, recipeId: string) =>
+    apiClient.put(`/collections/${collectionId}/recipes/${recipeId}`).then(() => undefined),
+
+  removeRecipe: (collectionId: string, recipeId: string) =>
+    apiClient.delete(`/collections/${collectionId}/recipes/${recipeId}`).then(() => undefined),
 }
 
 export async function createRecipeFull(input: {
