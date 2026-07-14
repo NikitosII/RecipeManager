@@ -1,13 +1,24 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Bookmark, Check, CircleCheck, Clock, Flame, Heart, Users } from 'lucide-react'
-import { useRecipe } from '@/hooks/use-recipes'
+import { ArrowLeft, Bookmark, Check, CircleCheck, Clock, Flame, Heart, Pencil, Trash2, User, Users, Utensils } from 'lucide-react'
+import { useDeleteRecipe, useRecipe } from '@/hooks/use-recipes'
+import { useAuthStore } from '@/stores/auth-store'
 import { resolveMediaUrl } from '@/config'
 import { MeasurementUnitLabel } from '@/types/api'
 import { decorationFor, PLACEHOLDER_NUTRITION } from '../placeholders'
 import { CategoryBadge, StarRating } from '../components/ui-bits'
 
-export function DetailScreen({ recipeId, onBack }: { recipeId: string; onBack: () => void }) {
+export function DetailScreen({
+  recipeId,
+  onBack,
+  onEdit,
+}: {
+  recipeId: string
+  onBack: () => void
+  onEdit: (id: string) => void
+}) {
   const { data: recipe, isLoading, isError } = useRecipe(recipeId)
+  const currentUser = useAuthStore((s) => s.user)
+  const deleteRecipe = useDeleteRecipe()
 
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(new Set())
   const [activeStep, setActiveStep] = useState(0)
@@ -42,7 +53,13 @@ export function DetailScreen({ recipeId, onBack }: { recipeId: string; onBack: (
   }
 
   const deco = decorationFor(recipe.id)
-  const image = resolveMediaUrl(recipe.imageUrl) ?? deco.fallbackImage
+  const image = resolveMediaUrl(recipe.imageUrl)
+  const isOwner = Boolean(currentUser) && currentUser!.userId === recipe.userId
+
+  const handleDelete = () => {
+    if (!window.confirm('Delete this recipe? This cannot be undone.')) return
+    deleteRecipe.mutate(recipe.id, { onSuccess: onBack })
+  }
 
   const toggleIngredient = (id: string) => {
     setCheckedIngredients((prev) => {
@@ -57,7 +74,13 @@ export function DetailScreen({ recipeId, onBack }: { recipeId: string; onBack: (
     <div className="min-h-screen bg-background" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* Hero */}
       <div className="relative h-[60vh] min-h-[380px] overflow-hidden bg-muted">
-        <img src={image} alt={recipe.title} className="w-full h-full object-cover" />
+        {image ? (
+          <img src={image} alt={recipe.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+            <Utensils size={72} />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#2C1A0E]/90 via-[#2C1A0E]/30 to-transparent" />
 
         <button
@@ -87,8 +110,10 @@ export function DetailScreen({ recipeId, onBack }: { recipeId: string; onBack: (
           </h1>
           <div className="flex flex-wrap items-center gap-4 text-white/80 text-sm">
             <span className="flex items-center gap-1.5">
-              <img src={deco.author.avatar} alt={deco.author.name} className="w-5 h-5 rounded-full object-cover" />
-              {deco.author.name}
+              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                <User size={11} />
+              </span>
+              {recipe.authorName}
             </span>
             <span className="flex items-center gap-1">
               <Clock size={13} /> {recipe.prepTimeMinutes} min prep
@@ -199,6 +224,26 @@ export function DetailScreen({ recipeId, onBack }: { recipeId: string; onBack: (
               </>
             )}
           </button>
+
+          {isOwner && (
+            <>
+              <button
+                onClick={() => onEdit(recipe.id)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm border border-border text-[#2C1A0E] hover:bg-muted transition-colors"
+              >
+                <Pencil size={16} />
+                Edit recipe
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteRecipe.isPending}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={16} />
+                {deleteRecipe.isPending ? 'Deleting…' : 'Delete recipe'}
+              </button>
+            </>
+          )}
 
           <div className="bg-white rounded-2xl border border-border p-5">
             <h3

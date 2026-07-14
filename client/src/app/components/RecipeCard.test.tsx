@@ -13,6 +13,7 @@ const recipe: RecipeSummary = {
   servings: 4,
   imageUrl: null,
   categoryName: 'Breakfast',
+  authorName: 'Ada Lovelace',
   dateCreated: new Date().toISOString(),
 }
 
@@ -21,6 +22,7 @@ describe('RecipeCard', () => {
     render(<RecipeCard recipe={recipe} onOpen={() => {}} />)
 
     expect(screen.getByText('Classic Pancakes')).toBeInTheDocument()
+    expect(screen.getByText(/by Ada Lovelace/)).toBeInTheDocument()
     expect(screen.getByText(/10 min prep/)).toBeInTheDocument()
     expect(screen.getByText(/4 servings/)).toBeInTheDocument()
   })

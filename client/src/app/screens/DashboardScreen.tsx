@@ -18,7 +18,6 @@ import { useCategories } from '@/hooks/use-catalog'
 import { useRecipes } from '@/hooks/use-recipes'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useAuthStore } from '@/stores/auth-store'
-import { CURRENT_USER_AVATAR } from '../placeholders'
 import { categoryVisual } from '../components/category-config'
 import { RecipeCard } from '../components/RecipeCard'
 import { SkeletonCard } from '../components/ui-bits'
@@ -27,6 +26,9 @@ const PAGE_SIZE = 9
 
 export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => void; onCreate: () => void }) {
   const logout = useAuthStore((s) => s.logout)
+  const user = useAuthStore((s) => s.user)
+  const initials =
+    (user ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() : '') || '?'
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -162,7 +164,9 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-muted transition-colors"
               >
-                <img src={CURRENT_USER_AVATAR} alt="User" className="w-7 h-7 rounded-full object-cover" />
+                <span className="w-7 h-7 rounded-full bg-[#D94F3A] text-white flex items-center justify-center text-xs font-semibold">
+                  {initials}
+                </span>
                 <ChevronDown size={13} className="text-muted-foreground hidden sm:block" />
               </button>
               {userMenuOpen && (

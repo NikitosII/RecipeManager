@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, Heart, Users } from 'lucide-react'
+import { Clock, Heart, Users, Utensils } from 'lucide-react'
 import type { RecipeSummary } from '@/types/api'
 import { resolveMediaUrl } from '@/config'
 import { decorationFor } from '../placeholders'
@@ -9,7 +9,7 @@ export function RecipeCard({ recipe, onOpen }: { recipe: RecipeSummary; onOpen: 
   const deco = decorationFor(recipe.id)
   // Favourites have no backend — this toggle is local visual decoration only.
   const [favorite, setFavorite] = useState(deco.initialFavorite)
-  const image = resolveMediaUrl(recipe.imageUrl) ?? deco.fallbackImage
+  const image = resolveMediaUrl(recipe.imageUrl)
 
   return (
     <div
@@ -17,11 +17,17 @@ export function RecipeCard({ recipe, onOpen }: { recipe: RecipeSummary; onOpen: 
       onClick={onOpen}
     >
       <div className="relative h-44 bg-muted overflow-hidden">
-        <img
-          src={image}
-          alt={recipe.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {image ? (
+          <img
+            src={image}
+            alt={recipe.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+            <Utensils size={32} />
+          </div>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -47,7 +53,7 @@ export function RecipeCard({ recipe, onOpen }: { recipe: RecipeSummary; onOpen: 
           </h3>
           <StarRating rating={deco.rating} />
         </div>
-        <p className="text-xs text-muted-foreground mb-3">by {deco.author.name}</p>
+        <p className="text-xs text-muted-foreground mb-3">by {recipe.authorName}</p>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock size={11} /> {recipe.prepTimeMinutes} min prep

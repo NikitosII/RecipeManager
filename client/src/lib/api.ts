@@ -51,6 +51,15 @@ export interface CreateRecipePayload {
   categoryId: string
 }
 
+export interface UpdateRecipePayload {
+  title: string
+  description: string | null
+  difficultyLevel: number
+  prepTimeMinutes: number
+  cookTimeMinutes: number
+  servings: number
+}
+
 export interface CreateRecipeStepInput {
   description: string
 }
@@ -71,6 +80,9 @@ export const recipesApi = {
 
   create: (body: CreateRecipePayload) =>
     apiClient.post<{ id: string }>('/recipes', body).then((r) => r.data.id),
+
+  update: (id: string, body: UpdateRecipePayload) =>
+    apiClient.put(`/recipes/${id}`, body).then(() => undefined),
 
   delete: (id: string) => apiClient.delete(`/recipes/${id}`).then(() => undefined),
 

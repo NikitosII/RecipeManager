@@ -4,8 +4,13 @@ import { AuthScreen } from './screens/AuthScreen'
 import { DashboardScreen } from './screens/DashboardScreen'
 import { DetailScreen } from './screens/DetailScreen'
 import { CreateScreen } from './screens/CreateScreen'
+import { EditScreen } from './screens/EditScreen'
 
-type Screen = { name: 'dashboard' } | { name: 'detail'; id: string } | { name: 'create' }
+type Screen =
+  | { name: 'dashboard' }
+  | { name: 'detail'; id: string }
+  | { name: 'create' }
+  | { name: 'edit'; id: string }
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -18,7 +23,17 @@ export default function App() {
   if (!isAuthenticated) return <AuthScreen />
 
   if (screen.name === 'detail') {
-    return <DetailScreen recipeId={screen.id} onBack={() => setScreen({ name: 'dashboard' })} />
+    return (
+      <DetailScreen
+        recipeId={screen.id}
+        onBack={() => setScreen({ name: 'dashboard' })}
+        onEdit={(id) => setScreen({ name: 'edit', id })}
+      />
+    )
+  }
+
+  if (screen.name === 'edit') {
+    return <EditScreen recipeId={screen.id} onBack={() => setScreen({ name: 'detail', id: screen.id })} />
   }
 
   if (screen.name === 'create') {

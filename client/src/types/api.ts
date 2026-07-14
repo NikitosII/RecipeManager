@@ -67,6 +67,7 @@ export interface RecipeSummary {
   servings: number
   imageUrl: string | null
   categoryName: string
+  authorName: string
   dateCreated: string
 }
 
@@ -105,6 +106,7 @@ export interface RecipeDetail {
   categoryId: string
   categoryName: string
   userId: string
+  authorName: string
   steps: RecipeStep[]
   ingredients: RecipeIngredient[]
   dateCreated: string
