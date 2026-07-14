@@ -45,6 +45,26 @@ internal static class ApiClientExtensions
         var created = await response.Content.ReadFromJsonAsync<CreatedIdResponse>();
         return created!.Id;
     }
+
+    /// <summary>
+    /// Creates a minimal recipe in the given category and returns its id.
+    /// </summary>
+    public static async Task<Guid> CreateRecipeAsync(this HttpClient client, Guid categoryId, string title = "Test Recipe")
+    {
+        var response = await client.PostAsJsonAsync("/api/v1/recipes", new
+        {
+            title,
+            description = (string?)null,
+            difficultyLevel = 1,
+            prepTimeMinutes = 5,
+            cookTimeMinutes = 5,
+            servings = 2,
+            categoryId
+        });
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<CreatedIdResponse>();
+        return created!.Id;
+    }
 }
 
 internal record CreatedIdResponse(Guid Id);

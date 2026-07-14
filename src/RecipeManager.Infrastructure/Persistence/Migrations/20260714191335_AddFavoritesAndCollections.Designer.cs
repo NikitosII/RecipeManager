@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RecipeManager.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RecipeManager.Infrastructure.Persistence;
 namespace RecipeManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RecipeDbContext))]
-    partial class RecipeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260714191335_AddFavoritesAndCollections")]
+    partial class AddFavoritesAndCollections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -271,30 +274,6 @@ namespace RecipeManager.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Ingredients");
-                });
-
-            modelBuilder.Entity("RecipeManager.Domain.Entities.Rating", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("RecipeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("DateCreated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("DateUpdated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Value")
-                        .HasColumnType("integer");
-
-                    b.HasKey("UserId", "RecipeId");
-
-                    b.HasIndex("RecipeId");
-
-                    b.ToTable("Ratings");
                 });
 
             modelBuilder.Entity("RecipeManager.Domain.Entities.Recipe", b =>
@@ -606,23 +585,6 @@ namespace RecipeManager.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("RecipeManager.Domain.Entities.Favorite", b =>
-                {
-                    b.HasOne("RecipeManager.Domain.Entities.Recipe", "Recipe")
-                        .WithMany()
-                        .HasForeignKey("RecipeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("RecipeManager.Infrastructure.Identity.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Recipe");
-                });
-
-            modelBuilder.Entity("RecipeManager.Domain.Entities.Rating", b =>
                 {
                     b.HasOne("RecipeManager.Domain.Entities.Recipe", "Recipe")
                         .WithMany()
