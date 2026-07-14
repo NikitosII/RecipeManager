@@ -13,4 +13,8 @@ public record RecipeSummaryDto(
     string? ImageUrl,
     string CategoryName,
     string AuthorName,
+    bool IsFavorite,
+    double AverageRating,
+    int RatingCount,
+    int? UserRating,
     DateTime DateCreated);

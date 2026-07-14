@@ -7,12 +7,7 @@ namespace RecipeManager.Infrastructure.Repositories;
 
 public class RecipeRepository(RecipeDbContext context) : IRecipeRepository
 {
-    public async Task<(IReadOnlyList<Recipe> Items, int TotalCount)> GetPagedAsync(
-        int page,
-        int pageSize,
-        string? searchTerm,
-        Guid? categoryId,
-        CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<Recipe> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? searchTerm, Guid? categoryId, CancellationToken cancellationToken = default)
     {
         var query = context.Recipes
             .Include(r => r.Category)
@@ -48,8 +43,7 @@ public class RecipeRepository(RecipeDbContext context) : IRecipeRepository
                 .ThenInclude(ri => ri.Ingredient)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
-    public async Task<IReadOnlyDictionary<Guid, string>> GetAuthorNamesAsync(
-        IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyDictionary<Guid, string>> GetAuthorNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
     {
         if (userIds.Count == 0)
             return new Dictionary<Guid, string>();

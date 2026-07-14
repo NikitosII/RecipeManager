@@ -17,6 +17,10 @@ public class RecipeDbContext(DbContextOptions<RecipeDbContext> options)
     public DbSet<RecipeStep> RecipeSteps => Set<RecipeStep>();
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Favorite> Favorites => Set<Favorite>();
+    public DbSet<Collection> Collections => Set<Collection>();
+    public DbSet<CollectionRecipe> CollectionRecipes => Set<CollectionRecipe>();
+    public DbSet<Rating> Ratings => Set<Rating>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

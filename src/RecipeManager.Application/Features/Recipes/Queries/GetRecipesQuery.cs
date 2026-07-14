@@ -8,9 +8,13 @@ public record GetRecipesQuery(
     int Page = 1,
     int PageSize = 10,
     string? Search = null,
-    Guid? CategoryId = null) : IRequest<PaginatedResponse<RecipeSummaryDto>>;
+    Guid? CategoryId = null,
+    Guid? RequestingUserId = null) : IRequest<PaginatedResponse<RecipeSummaryDto>>;
 
-public class GetRecipesQueryHandler(IRecipeRepository recipeRepository) : IRequestHandler<GetRecipesQuery, PaginatedResponse<RecipeSummaryDto>>
+public class GetRecipesQueryHandler(
+    IRecipeRepository recipeRepository,
+    IFavoriteRepository favoriteRepository,
+    IRatingRepository ratingRepository) : IRequestHandler<GetRecipesQuery, PaginatedResponse<RecipeSummaryDto>>
 {
     public async Task<PaginatedResponse<RecipeSummaryDto>> Handle(GetRecipesQuery request, CancellationToken cancellationToken)
     {
@@ -20,21 +24,23 @@ public class GetRecipesQueryHandler(IRecipeRepository recipeRepository) : IReque
         var (items, total) = await recipeRepository.GetPagedAsync(
             page, pageSize, request.Search, request.CategoryId, cancellationToken);
 
+        var recipeIds = items.Select(r => r.Id).ToList();
+
         var authorNames = await recipeRepository.GetAuthorNamesAsync(
             items.Select(r => r.UserId).Distinct().ToList(), cancellationToken);
 
-        var dtos = items.Select(r => new RecipeSummaryDto(
-            r.Id,
-            r.Title,
-            r.Description,
-            r.DifficultyLevel,
-            r.PrepTimeMinutes,
-            r.CookTimeMinutes,
-            r.Servings,
-            r.ImageUrl,
-            r.Category?.Name ?? string.Empty,
+        var favoritedIds = request.RequestingUserId is { } userId
+            ? await favoriteRepository.GetFavoritedRecipeIdsAsync(userId, recipeIds, cancellationToken)
+            : (IReadOnlySet<Guid>)new HashSet<Guid>();
+
+        var ratings = await ratingRepository.GetSummariesAsync(
+            recipeIds, request.RequestingUserId, cancellationToken);
+
+        var dtos = items.Select(r => RecipeMapping.ToSummary(
+            r,
             authorNames.GetValueOrDefault(r.UserId, "Unknown"),
-            r.DateCreated)).ToList();
+            favoritedIds.Contains(r.Id),
+            ratings.GetValueOrDefault(r.Id))).ToList();
 
         return new PaginatedResponse<RecipeSummaryDto>(dtos, page, pageSize, total);
     }

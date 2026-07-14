@@ -2,6 +2,7 @@ using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RecipeManager.Application.Features.Ratings.Commands;
 using RecipeManager.Application.Features.Recipes.Commands;
 using RecipeManager.Application.Features.Recipes.Queries;
 using RecipeManager.Domain.Enums;
@@ -17,6 +18,11 @@ public class RecipesController(IMediator mediator) : ControllerBase
     // The authenticated user's id, taken from the JWT "sub" claim. Only read on endpoints that require authorization.
     private Guid CurrentUserId => Guid.Parse(User.FindFirst("sub")!.Value);
 
+    // Same, but tolerant of anonymous callers — used on the [AllowAnonymous] read
+    // endpoints to stamp the per-user "is favourite" flag when a token is present.
+    private Guid? OptionalUserId =>
+        User.FindFirst("sub") is { } claim ? Guid.Parse(claim.Value) : null;
+
     [HttpGet]
     [AllowAnonymous]
     public async Task<IActionResult> GetAll(
@@ -27,7 +33,7 @@ public class RecipesController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetRecipesQuery(page, pageSize, search, categoryId),
+            new GetRecipesQuery(page, pageSize, search, categoryId, OptionalUserId),
             cancellationToken);
         return Ok(result);
     }
@@ -36,7 +42,7 @@ public class RecipesController(IMediator mediator) : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(new GetRecipeByIdQuery(id), cancellationToken);
+        var result = await mediator.Send(new GetRecipeByIdQuery(id, OptionalUserId), cancellationToken);
         return Ok(result);
     }
 
@@ -98,6 +104,22 @@ public class RecipesController(IMediator mediator) : ControllerBase
             cancellationToken);
 
         return Ok(new { imageUrl });
+    }
+
+    // -- Ratings -- //
+
+    [HttpPut("{id:guid}/rating")]
+    public async Task<IActionResult> Rate(Guid id, [FromBody] RateRecipeRequest request, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new RateRecipeCommand(id, CurrentUserId, request.Value), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}/rating")]
+    public async Task<IActionResult> RemoveRating(Guid id, CancellationToken cancellationToken)
+    {
+        await mediator.Send(new RemoveRecipeRatingCommand(id, CurrentUserId), cancellationToken);
+        return NoContent();
     }
 
     // -- Step management -- //
@@ -162,6 +184,8 @@ public record UpdateRecipeRequest(
     int PrepTimeMinutes,
     int CookTimeMinutes,
     int Servings);
+
+public record RateRecipeRequest(int Value);
 
 public record AppendStepRequest(string Description);
 

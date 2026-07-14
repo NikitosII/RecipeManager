@@ -7,8 +7,7 @@ namespace RecipeManager.Infrastructure.Services;
 
 public class UserService(UserManager<ApplicationUser> userManager) : IUserService
 {
-    public async Task<(bool Success, UserClaimsDto? User, IReadOnlyList<string> Errors)> RegisterAsync(
-        string firstName, string lastName, string email, string password, CancellationToken cancellationToken = default)
+    public async Task<(bool Success, UserClaimsDto? User, IReadOnlyList<string> Errors)> RegisterAsync(string firstName, string lastName, string email, string password, CancellationToken cancellationToken = default)
     {
         var user = new ApplicationUser
         {
