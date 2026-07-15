@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RecipeManager.Domain.Entities;
+using RecipeManager.Domain.Enums;
 using RecipeManager.Domain.Interfaces;
 using RecipeManager.Infrastructure.Persistence;
 
@@ -7,24 +8,63 @@ namespace RecipeManager.Infrastructure.Repositories;
 
 public class RecipeRepository(RecipeDbContext context) : IRecipeRepository
 {
-    public async Task<(IReadOnlyList<Recipe> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? searchTerm, Guid? categoryId, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<Recipe> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, RecipeFilter filter, RecipeSortBy sortBy = RecipeSortBy.DateCreated, bool sortDescending = true, CancellationToken cancellationToken = default)
     {
         var query = context.Recipes
             .Include(r => r.Category)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(searchTerm))
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search;
             query = query.Where(r =>
-                r.Title.Contains(searchTerm) ||
-                (r.Description != null && r.Description.Contains(searchTerm)));
+                r.Title.Contains(term) ||
+                (r.Description != null && r.Description.Contains(term)));
+        }
 
-        if (categoryId.HasValue)
-            query = query.Where(r => r.CategoryId == categoryId.Value);
+        if (filter.CategoryId.HasValue)
+            query = query.Where(r => r.CategoryId == filter.CategoryId.Value);
+
+        if (filter.Difficulty.HasValue)
+            query = query.Where(r => r.DifficultyLevel == filter.Difficulty.Value);
+
+        if (filter.MaxPrepTimeMinutes.HasValue)
+            query = query.Where(r => r.PrepTimeMinutes <= filter.MaxPrepTimeMinutes.Value);
+
+        if (filter.MaxCookTimeMinutes.HasValue)
+            query = query.Where(r => r.CookTimeMinutes <= filter.MaxCookTimeMinutes.Value);
+
+        if (filter.MinServings.HasValue)
+            query = query.Where(r => r.Servings >= filter.MinServings.Value);
+
+        // Recipes that contain *all* of the requested ingredients: the count of
+        // matched ingredients on the recipe must equal the number requested.
+        if (filter.IngredientIds is { Count: > 0 })
+        {
+            var ingredientIds = filter.IngredientIds.ToList();
+            var required = ingredientIds.Count;
+            query = query.Where(r =>
+                r.RecipeIngredients.Count(ri => ingredientIds.Contains(ri.IngredientId)) == required);
+        }
 
         var total = await query.CountAsync(cancellationToken);
 
-        var items = await query
-            .OrderByDescending(r => r.DateCreated)
+        var ordered = sortBy switch
+        {
+            RecipeSortBy.Name => sortDescending
+                ? query.OrderByDescending(r => r.Title)
+                : query.OrderBy(r => r.Title),
+            RecipeSortBy.Rating => sortDescending
+                ? query.OrderByDescending(r => context.Ratings.Where(rt => rt.RecipeId == r.Id).Average(rt => (double?)rt.Value) ?? 0)
+                : query.OrderBy(r => context.Ratings.Where(rt => rt.RecipeId == r.Id).Average(rt => (double?)rt.Value) ?? 0),
+            _ => sortDescending
+                ? query.OrderByDescending(r => r.DateCreated)
+                : query.OrderBy(r => r.DateCreated),
+        };
+
+        var items = await ordered
+            .ThenByDescending(r => r.DateCreated)
+            .ThenBy(r => r.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

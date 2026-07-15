@@ -30,10 +30,29 @@ public class RecipesController(IMediator mediator) : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
         [FromQuery] Guid? categoryId = null,
+        [FromQuery] DifficultyLevel? difficulty = null,
+        [FromQuery] int? maxPrepTime = null,
+        [FromQuery] int? maxCookTime = null,
+        [FromQuery] int? minServings = null,
+        [FromQuery] Guid[]? ingredientIds = null,
+        [FromQuery] RecipeSortBy sortBy = RecipeSortBy.DateCreated,
+        [FromQuery] bool sortDescending = true,
         CancellationToken cancellationToken = default)
     {
         var result = await mediator.Send(
-            new GetRecipesQuery(page, pageSize, search, categoryId, OptionalUserId),
+            new GetRecipesQuery(
+                page,
+                pageSize,
+                search,
+                categoryId,
+                difficulty,
+                maxPrepTime,
+                maxCookTime,
+                minServings,
+                ingredientIds,
+                sortBy,
+                sortDescending,
+                OptionalUserId),
             cancellationToken);
         return Ok(result);
     }

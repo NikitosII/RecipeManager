@@ -1,5 +1,6 @@
 using MediatR;
 using RecipeManager.Application.DTOs;
+using RecipeManager.Domain.Enums;
 using RecipeManager.Domain.Interfaces;
 
 namespace RecipeManager.Application.Features.Recipes.Queries;
@@ -9,6 +10,13 @@ public record GetRecipesQuery(
     int PageSize = 10,
     string? Search = null,
     Guid? CategoryId = null,
+    DifficultyLevel? Difficulty = null,
+    int? MaxPrepTimeMinutes = null,
+    int? MaxCookTimeMinutes = null,
+    int? MinServings = null,
+    IReadOnlyCollection<Guid>? IngredientIds = null,
+    RecipeSortBy SortBy = RecipeSortBy.DateCreated,
+    bool SortDescending = true,
     Guid? RequestingUserId = null) : IRequest<PaginatedResponse<RecipeSummaryDto>>;
 
 public class GetRecipesQueryHandler(
@@ -21,8 +29,17 @@ public class GetRecipesQueryHandler(
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
 
+        var filter = new RecipeFilter(
+            request.Search,
+            request.CategoryId,
+            request.Difficulty,
+            request.MaxPrepTimeMinutes,
+            request.MaxCookTimeMinutes,
+            request.MinServings,
+            request.IngredientIds);
+
         var (items, total) = await recipeRepository.GetPagedAsync(
-            page, pageSize, request.Search, request.CategoryId, cancellationToken);
+            page, pageSize, filter, request.SortBy, request.SortDescending, cancellationToken);
 
         var recipeIds = items.Select(r => r.Id).ToList();
 
