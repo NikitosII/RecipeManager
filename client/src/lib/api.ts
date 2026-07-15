@@ -41,6 +41,13 @@ export interface RecipeListParams {
   pageSize?: number
   search?: string
   categoryId?: string
+  difficulty?: number
+  maxPrepTime?: number
+  maxCookTime?: number
+  minServings?: number
+  ingredientIds?: string[]
+  sortBy?: number
+  sortDescending?: boolean
 }
 
 export interface CreateRecipePayload {
@@ -75,7 +82,7 @@ export interface CreateRecipeIngredientInput {
 export const recipesApi = {
   list: (params: RecipeListParams) =>
     apiClient
-      .get<Paginated<RecipeSummary>>('/recipes', { params })
+      .get<Paginated<RecipeSummary>>('/recipes', { params, paramsSerializer: { indexes: null } })
       .then((r) => r.data),
 
   getById: (id: string) => apiClient.get<RecipeDetail>(`/recipes/${id}`).then((r) => r.data),

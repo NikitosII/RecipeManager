@@ -1,4 +1,4 @@
-// ─── Enums (mirrors backend integer enums; no TS `enum` per erasableSyntaxOnly) ──
+// -- Enums --
 
 export const DifficultyLevel = {
   Easy: 1,
@@ -14,6 +14,14 @@ export const DifficultyLabel: Record<number, string> = {
   3: 'Hard',
   4: 'Expert',
 }
+
+// Mirrors the backend RecipeSortBy enum; direction is passed separately.
+export const RecipeSortBy = {
+  DateCreated: 0,
+  Name: 1,
+  Rating: 2,
+} as const
+export type RecipeSortBy = (typeof RecipeSortBy)[keyof typeof RecipeSortBy]
 
 export const MeasurementUnit = {
   Piece: 1,

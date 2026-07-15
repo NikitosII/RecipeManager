@@ -15,8 +15,9 @@ import {
   Trash2,
   User,
   Utensils,
+  X,
 } from 'lucide-react'
-import { useCategories } from '@/hooks/use-catalog'
+import { useCategories, useIngredients } from '@/hooks/use-catalog'
 import { useRecipes } from '@/hooks/use-recipes'
 import { useFavorites, useToggleFavorite } from '@/hooks/use-favorites'
 import {
@@ -28,6 +29,7 @@ import {
 } from '@/hooks/use-collections'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useAuthStore } from '@/stores/auth-store'
+import { DifficultyLabel, RecipeSortBy } from '@/types/api'
 import type { RecipeSummary } from '@/types/api'
 import { categoryVisual } from '../components/category-config'
 import { RecipeCard } from '../components/RecipeCard'
@@ -41,6 +43,41 @@ type View =
   | { kind: 'collections' }
   | { kind: 'collection'; id: string; name: string }
 
+interface Filters {
+  difficulty: number | null
+  maxPrepTime: number | null
+  maxCookTime: number | null
+  minServings: number | null
+  ingredientIds: string[]
+}
+
+const EMPTY_FILTERS: Filters = {
+  difficulty: null,
+  maxPrepTime: null,
+  maxCookTime: null,
+  minServings: null,
+  ingredientIds: [],
+}
+
+function countActiveFilters(f: Filters): number {
+  return (
+    (f.difficulty !== null ? 1 : 0) +
+    (f.maxPrepTime !== null ? 1 : 0) +
+    (f.maxCookTime !== null ? 1 : 0) +
+    (f.minServings !== null ? 1 : 0) +
+    f.ingredientIds.length
+  )
+}
+
+const SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest', sortBy: RecipeSortBy.DateCreated, sortDescending: true },
+  { key: 'name', label: 'Name (A–Z)', sortBy: RecipeSortBy.Name, sortDescending: false },
+  { key: 'rating', label: 'Top rated', sortBy: RecipeSortBy.Rating, sortDescending: true },
+] as const
+
+type SortKey = (typeof SORT_OPTIONS)[number]['key']
+const DEFAULT_SORT: SortKey = 'newest'
+
 export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => void; onCreate: () => void }) {
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
@@ -53,6 +90,20 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
   const [page, setPage] = useState(1)
   const [favPage, setFavPage] = useState(1)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  const [sort, setSort] = useState<SortKey>(DEFAULT_SORT)
+
+  const activeFilterCount = countActiveFilters(filters)
+  const activeSort = SORT_OPTIONS.find((o) => o.key === sort) ?? SORT_OPTIONS[0]
+  const applyFilters = (next: Filters) => {
+    setFilters(next)
+    setPage(1)
+  }
+  const applySort = (next: SortKey) => {
+    setSort(next)
+    setPage(1)
+  }
 
   const debouncedSearch = useDebouncedValue(search)
   const toggleFavorite = useToggleFavorite()
@@ -66,6 +117,13 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
     pageSize: PAGE_SIZE,
     search: debouncedSearch.trim() || undefined,
     categoryId: activeCategoryId ?? undefined,
+    difficulty: filters.difficulty ?? undefined,
+    maxPrepTime: filters.maxPrepTime ?? undefined,
+    maxCookTime: filters.maxCookTime ?? undefined,
+    minServings: filters.minServings ?? undefined,
+    ingredientIds: filters.ingredientIds.length ? filters.ingredientIds : undefined,
+    sortBy: activeSort.sortBy,
+    sortDescending: activeSort.sortDescending,
   })
   const { data: favData, isFetching: favFetching } = useFavorites({ page: favPage, pageSize: PAGE_SIZE })
 
@@ -231,8 +289,25 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
               <SectionHeading
                 title={activeCategoryId === null ? 'All Recipes' : activeCategoryName}
                 subtitle={`${totalCount} ${totalCount === 1 ? 'recipe' : 'recipes'} found`}
-                showFilter
+                filter={{
+                  open: filterOpen,
+                  activeCount: activeFilterCount,
+                  onToggle: () => setFilterOpen((o) => !o),
+                }}
               />
+              {filterOpen && (
+                <FilterPanel
+                  filters={filters}
+                  activeCount={activeFilterCount}
+                  onChange={applyFilters}
+                  sort={sort}
+                  onSortChange={applySort}
+                  onClear={() => {
+                    applyFilters(EMPTY_FILTERS)
+                    applySort(DEFAULT_SORT)
+                  }}
+                />
+              )}
               <RecipeGrid
                 recipes={recipes}
                 isFetching={isFetching}
@@ -282,7 +357,15 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
   )
 }
 
-function SectionHeading({ title, subtitle, showFilter }: { title: string; subtitle: string; showFilter?: boolean }) {
+function SectionHeading({
+  title,
+  subtitle,
+  filter,
+}: {
+  title: string
+  subtitle: string
+  filter?: { open: boolean; activeCount: number; onToggle: () => void }
+}) {
   return (
     <div className="mb-6 flex items-end justify-between">
       <div>
@@ -291,12 +374,203 @@ function SectionHeading({ title, subtitle, showFilter }: { title: string; subtit
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
       </div>
-      {showFilter && (
-        <div className="flex items-center gap-2 text-muted-foreground">
+      {filter && (
+        <button
+          onClick={filter.onToggle}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-colors ${
+            filter.open || filter.activeCount > 0
+              ? 'bg-rose-50 border-[#D94F3A]/30 text-[#D94F3A]'
+              : 'border-border text-muted-foreground hover:bg-muted'
+          }`}
+        >
           <SlidersHorizontal size={14} />
-          <span className="text-xs">Filter</span>
-        </div>
+          <span>Filter</span>
+          {filter.activeCount > 0 && (
+            <span className="min-w-4 h-4 px-1 rounded-full bg-[#D94F3A] text-white text-[10px] font-semibold flex items-center justify-center">
+              {filter.activeCount}
+            </span>
+          )}
+        </button>
       )}
+    </div>
+  )
+}
+
+const filterPillClass = (active: boolean) =>
+  `px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+    active
+      ? 'bg-[#D94F3A] text-white border-[#D94F3A]'
+      : 'bg-white text-[#2C1A0E] border-border hover:border-[#D94F3A]/40'
+  }`
+
+const filterNumberInputClass =
+  'w-full px-3 py-2 bg-input-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D94F3A]/25 focus:border-[#D94F3A] transition-all'
+
+function FilterFieldLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">{children}</p>
+}
+
+function FilterPanel({
+  filters,
+  activeCount,
+  onChange,
+  sort,
+  onSortChange,
+  onClear,
+}: {
+  filters: Filters
+  activeCount: number
+  onChange: (next: Filters) => void
+  sort: SortKey
+  onSortChange: (next: SortKey) => void
+  onClear: () => void
+}) {
+  const { data: ingredients = [] } = useIngredients()
+  const [ingredientSearch, setIngredientSearch] = useState('')
+
+  const set = <K extends keyof Filters>(key: K, value: Filters[K]) => onChange({ ...filters, [key]: value })
+
+  const parseNumber = (raw: string): number | null => {
+    if (raw.trim() === '') return null
+    const n = Number(raw)
+    return Number.isNaN(n) || n < 0 ? null : n
+  }
+  const numberValue = (v: number | null) => (v === null ? '' : String(v))
+
+  const toggleIngredient = (id: string) =>
+    set(
+      'ingredientIds',
+      filters.ingredientIds.includes(id)
+        ? filters.ingredientIds.filter((x) => x !== id)
+        : [...filters.ingredientIds, id],
+    )
+
+  const visibleIngredients = useMemo(() => {
+    const q = ingredientSearch.trim().toLowerCase()
+    const list = q ? ingredients.filter((i) => i.name.toLowerCase().includes(q)) : ingredients
+    // Always keep already-selected ingredients visible, then fill up to a cap.
+    const selected = ingredients.filter((i) => filters.ingredientIds.includes(i.id))
+    const rest = list.filter((i) => !filters.ingredientIds.includes(i.id))
+    return [...selected, ...rest].slice(0, 30)
+  }, [ingredients, ingredientSearch, filters.ingredientIds])
+
+  return (
+    <div className="mb-6 rounded-2xl border border-border bg-white p-5 space-y-5">
+      {/* Sort */}
+      <div>
+        <FilterFieldLabel>Sort by</FilterFieldLabel>
+        <div className="flex flex-wrap gap-2">
+          {SORT_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              onClick={() => onSortChange(option.key)}
+              className={filterPillClass(sort === option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Difficulty */}
+      <div>
+        <FilterFieldLabel>Difficulty</FilterFieldLabel>
+        <div className="flex flex-wrap gap-2">
+          {[1, 2, 3, 4].map((level) => {
+            const active = filters.difficulty === level
+            return (
+              <button
+                key={level}
+                onClick={() => set('difficulty', active ? null : level)}
+                className={filterPillClass(active)}
+              >
+                {DifficultyLabel[level]}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Numeric bounds */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <FilterFieldLabel>Max prep (min)</FilterFieldLabel>
+          <input
+            type="number"
+            min={0}
+            placeholder="Any"
+            value={numberValue(filters.maxPrepTime)}
+            onChange={(e) => set('maxPrepTime', parseNumber(e.target.value))}
+            className={filterNumberInputClass}
+          />
+        </div>
+        <div>
+          <FilterFieldLabel>Max cook (min)</FilterFieldLabel>
+          <input
+            type="number"
+            min={0}
+            placeholder="Any"
+            value={numberValue(filters.maxCookTime)}
+            onChange={(e) => set('maxCookTime', parseNumber(e.target.value))}
+            className={filterNumberInputClass}
+          />
+        </div>
+        <div>
+          <FilterFieldLabel>Min servings</FilterFieldLabel>
+          <input
+            type="number"
+            min={1}
+            placeholder="Any"
+            value={numberValue(filters.minServings)}
+            onChange={(e) => set('minServings', parseNumber(e.target.value))}
+            className={filterNumberInputClass}
+          />
+        </div>
+      </div>
+
+      {/* Ingredients */}
+      <div>
+        <FilterFieldLabel>Ingredients (recipe must contain all selected)</FilterFieldLabel>
+        <div className="relative max-w-xs mb-3">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={ingredientSearch}
+            onChange={(e) => setIngredientSearch(e.target.value)}
+            placeholder="Search ingredients…"
+            className="w-full pl-8 pr-3 py-2 bg-input-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D94F3A]/25 focus:border-[#D94F3A] transition-all"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto">
+          {visibleIngredients.length > 0 ? (
+            visibleIngredients.map((ing) => (
+              <button
+                key={ing.id}
+                onClick={() => toggleIngredient(ing.id)}
+                className={filterPillClass(filters.ingredientIds.includes(ing.id))}
+              >
+                {ing.name}
+              </button>
+            ))
+          ) : (
+            <p className="text-xs text-muted-foreground">No ingredients match your search.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-border pt-4">
+        <span className="text-xs text-muted-foreground">
+          {activeCount === 0 ? 'No filters applied' : `${activeCount} ${activeCount === 1 ? 'filter' : 'filters'} applied`}
+        </span>
+        <button
+          onClick={onClear}
+          disabled={activeCount === 0}
+          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-[#D94F3A] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <X size={14} />
+          Clear all
+        </button>
+      </div>
     </div>
   )
 }
