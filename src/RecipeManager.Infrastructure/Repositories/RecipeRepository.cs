@@ -72,6 +72,9 @@ public class RecipeRepository(RecipeDbContext context) : IRecipeRepository
         return (items, total);
     }
 
+    public async Task<int> CountByUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        => await context.Recipes.CountAsync(r => r.UserId == userId, cancellationToken);
+
     public async Task<Recipe?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await context.Recipes.FindAsync([id], cancellationToken);
 

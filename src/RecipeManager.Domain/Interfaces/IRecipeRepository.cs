@@ -25,6 +25,8 @@ public interface IRecipeRepository
         bool sortDescending = true,
         CancellationToken cancellationToken = default);
 
+    Task<int> CountByUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
     Task<Recipe?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<Recipe?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);

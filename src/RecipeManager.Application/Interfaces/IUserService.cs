@@ -11,4 +11,9 @@ public interface IUserService
         string email, string password, CancellationToken cancellationToken = default);
 
     Task<UserClaimsDto?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task<(string Email, string FirstName, string LastName, string? AvatarUrl)?> GetProfileAsync(
+        Guid userId, CancellationToken cancellationToken = default);
+
+    Task SetAvatarUrlAsync(Guid userId, string? avatarUrl, CancellationToken cancellationToken = default);
 }

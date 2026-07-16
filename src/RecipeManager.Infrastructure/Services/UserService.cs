@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using RecipeManager.Application.DTOs;
 using RecipeManager.Application.Interfaces;
+using RecipeManager.Domain.Exceptions;
 using RecipeManager.Infrastructure.Identity;
 
 namespace RecipeManager.Infrastructure.Services;
@@ -61,5 +62,23 @@ public class UserService(UserManager<ApplicationUser> userManager) : IUserServic
 
         var roles = await userManager.GetRolesAsync(user);
         return new UserClaimsDto(user.Id, user.Email!, user.FirstName, user.LastName, roles.ToArray());
+    }
+
+    public async Task<(string Email, string FirstName, string LastName, string? AvatarUrl)?> GetProfileAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return null;
+
+        return (user.Email!, user.FirstName, user.LastName, user.AvatarUrl);
+    }
+
+    public async Task SetAvatarUrlAsync(Guid userId, string? avatarUrl, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString())
+                   ?? throw new NotFoundException(nameof(ApplicationUser), userId);
+
+        user.AvatarUrl = avatarUrl;
+        await userManager.UpdateAsync(user);
     }
 }
