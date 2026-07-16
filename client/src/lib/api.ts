@@ -10,6 +10,7 @@ import type {
   RecipeDetail,
   RecipeStep,
   RecipeSummary,
+  UserProfile,
 } from '@/types/api'
 
 // -- Auth -- //
@@ -22,6 +23,22 @@ export const authApi = {
     apiClient.post<AuthResponse>('/auth/login', body).then((r) => r.data),
 
   logout: (refreshToken: string) => apiClient.post('/auth/logout', { refreshToken }).then(() => undefined),
+}
+
+// -- Users -- //
+
+export const usersApi = {
+  me: () => apiClient.get<UserProfile>('/users/me').then((r) => r.data),
+
+  uploadAvatar: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient
+      .post<{ avatarUrl: string }>('/users/me/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data.avatarUrl)
+  },
 }
 
 // -- Categories & ingredients -- //

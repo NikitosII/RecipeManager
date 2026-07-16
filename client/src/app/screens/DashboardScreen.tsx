@@ -28,10 +28,13 @@ import {
   useRemoveRecipeFromCollection,
 } from '@/hooks/use-collections'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useProfile } from '@/hooks/use-profile'
 import { useAuthStore } from '@/stores/auth-store'
+import { resolveMediaUrl } from '@/config'
 import { DifficultyLabel, RecipeSortBy } from '@/types/api'
 import type { RecipeSummary } from '@/types/api'
 import { categoryVisual } from '../components/category-config'
+import { ProfileModal } from '../components/ProfileModal'
 import { RecipeCard } from '../components/RecipeCard'
 import { SkeletonCard } from '../components/ui-bits'
 
@@ -83,6 +86,8 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
   const user = useAuthStore((s) => s.user)
   const initials =
     (user ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() : '') || '?'
+  const { data: profile } = useProfile()
+  const headerAvatar = resolveMediaUrl(profile?.avatarUrl)
 
   const [view, setView] = useState<View>({ kind: 'recipes' })
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
@@ -90,6 +95,7 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
   const [page, setPage] = useState(1)
   const [favPage, setFavPage] = useState(1)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [sort, setSort] = useState<SortKey>(DEFAULT_SORT)
@@ -251,9 +257,17 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className="w-7 h-7 rounded-full bg-[#D94F3A] text-white flex items-center justify-center text-xs font-semibold">
-                  {initials}
-                </span>
+                {headerAvatar ? (
+                  <img
+                    src={headerAvatar}
+                    alt=""
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="w-7 h-7 rounded-full bg-[#D94F3A] text-white flex items-center justify-center text-xs font-semibold">
+                    {initials}
+                  </span>
+                )}
                 <ChevronDown size={13} className="text-muted-foreground hidden sm:block" />
               </button>
               {userMenuOpen && (
@@ -268,6 +282,7 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
                       onClick={() => {
                         setUserMenuOpen(false)
                         if (item.label === 'Sign out') void logout()
+                        if (item.label === 'My Profile') setProfileOpen(true)
                       }}
                       className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors ${
                         item.red ? 'text-[#D94F3A] hover:bg-rose-50' : 'text-[#2C1A0E] hover:bg-muted'
@@ -353,6 +368,8 @@ export function DashboardScreen({ onOpen, onCreate }: { onOpen: (id: string) => 
           )}
         </main>
       </div>
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   )
 }

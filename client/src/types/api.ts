@@ -173,3 +173,12 @@ export interface AuthUser {
   firstName: string
   lastName: string
 }
+
+export interface UserProfile {
+  userId: string
+  email: string
+  firstName: string
+  lastName: string
+  avatarUrl: string | null
+  recipeCount: number
+}
