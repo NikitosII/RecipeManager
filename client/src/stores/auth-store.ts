@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { tokenStorage } from '@/lib/token-storage'
+import { queryClient } from '@/lib/query-client'
 import { authApi } from '@/lib/api'
 import type { AuthResponse, AuthUser } from '@/types/api'
 
@@ -16,6 +17,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: Boolean(tokenStorage.getAccess()),
 
   setSession: (auth) => {
+    // Drop any cached data from a previous session
+    queryClient.clear()
     tokenStorage.setSession(auth)
     set({
       user: { userId: auth.userId, email: auth.email, firstName: auth.firstName, lastName: auth.lastName },
@@ -33,11 +36,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }
     tokenStorage.clear()
+    queryClient.clear()
     set({ user: null, isAuthenticated: false })
   },
 
   clear: () => {
     tokenStorage.clear()
+    queryClient.clear()
     set({ user: null, isAuthenticated: false })
   },
 }))
