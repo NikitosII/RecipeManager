@@ -49,6 +49,15 @@ public class Recipe : BaseEntity
 
     public Guid UserId { get; private set; }
 
+    // -- Nutrition -- //
+    // Auto (default): figures are computed from the ingredients at read time and nothing below is used. 
+    public NutritionMode NutritionMode { get; private set; } = NutritionMode.Auto;
+    public decimal? ManualCalories { get; private set; }
+    public decimal? ManualProtein { get; private set; }
+    public decimal? ManualFat { get; private set; }
+    public decimal? ManualCarbohydrates { get; private set; }
+    public decimal? ManualFiber { get; private set; }
+
     // -- Basic updates -- //
 
     public void Update(
@@ -74,13 +83,36 @@ public class Recipe : BaseEntity
         DateUpdated = DateTime.UtcNow;
     }
 
-    // -- Step management via LinkedList -- //
-    /// <summary>
-    /// Steps are stored as a List<RecipeStep> for EF Core persistence but
-    /// all insert/remove operations use a LinkedList so that mid-sequence
-    /// changes are O(1) node-pointer updates rather than O(n) array shifts.
-    /// </summary>
+    // -- Nutrition -- //
 
+    /// <summary>
+    /// Switches the recipe to manual nutrition and stores the author's per-serving
+    /// figures. Use this when the recipe is too involved for automatic calculation.
+    /// </summary>
+    public void SetManualNutrition(decimal calories, decimal protein, decimal fat, decimal carbohydrates, decimal? fiber)
+    {
+        NutritionMode = NutritionMode.Manual;
+        ManualCalories = calories;
+        ManualProtein = protein;
+        ManualFat = fat;
+        ManualCarbohydrates = carbohydrates;
+        ManualFiber = fiber;
+        DateUpdated = DateTime.UtcNow;
+    }
+
+    /// <summary>Reverts to automatic calculation and clears any stored manual figures.</summary>
+    public void UseAutomaticNutrition()
+    {
+        NutritionMode = NutritionMode.Auto;
+        ManualCalories = null;
+        ManualProtein = null;
+        ManualFat = null;
+        ManualCarbohydrates = null;
+        ManualFiber = null;
+        DateUpdated = DateTime.UtcNow;
+    }
+
+    // -- Step management via LinkedList -- //
     public LinkedList<RecipeStep> GetSteps() =>
         new(_steps.OrderBy(s => s.StepNumber));
 
