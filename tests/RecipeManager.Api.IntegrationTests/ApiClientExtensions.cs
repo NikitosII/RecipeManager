@@ -47,24 +47,54 @@ internal static class ApiClientExtensions
     }
 
     /// <summary>
-    /// Creates a minimal recipe in the given category and returns its id.
+    /// Creates a recipe in the given category and returns its id. Numeric/difficulty
+    /// attributes default to a minimal recipe but can be overridden for filter tests.
     /// </summary>
-    public static async Task<Guid> CreateRecipeAsync(this HttpClient client, Guid categoryId, string title = "Test Recipe")
+    public static async Task<Guid> CreateRecipeAsync(
+        this HttpClient client,
+        Guid categoryId,
+        string title = "Test Recipe",
+        int difficultyLevel = 1,
+        int prepTimeMinutes = 5,
+        int cookTimeMinutes = 5,
+        int servings = 2)
     {
         var response = await client.PostAsJsonAsync("/api/v1/recipes", new
         {
             title,
             description = (string?)null,
-            difficultyLevel = 1,
-            prepTimeMinutes = 5,
-            cookTimeMinutes = 5,
-            servings = 2,
+            difficultyLevel,
+            prepTimeMinutes,
+            cookTimeMinutes,
+            servings,
             categoryId
         });
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<CreatedIdResponse>();
         return created!.Id;
     }
+
+    /// <summary>
+    /// Adds an ingredient (by name) to a recipe and returns its global ingredient id.
+    /// Ingredients are looked up/created by name, so passing the same name to two
+    /// recipes links them to the same ingredient id.
+    /// </summary>
+    public static async Task<Guid> AddIngredientAsync(
+        this HttpClient client,
+        Guid recipeId,
+        string name,
+        decimal quantity = 1m,
+        int unit = 2 /* Gram */)
+    {
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/recipes/{recipeId}/ingredients",
+            new { name, quantity, unit });
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<RecipeIngredientDto>();
+        return created!.IngredientId;
+    }
 }
+
+internal record RecipeIngredientDto(Guid IngredientId, string IngredientName, decimal Quantity, int Unit);
 
 internal record CreatedIdResponse(Guid Id);
