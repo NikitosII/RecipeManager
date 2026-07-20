@@ -21,5 +21,6 @@ public record RecipeDetailDto(
     int? UserRating,
     IReadOnlyList<RecipeStepDto> Steps,
     IReadOnlyList<RecipeIngredientDto> Ingredients,
+    NutritionDto Nutrition,
     DateTime DateCreated,
     DateTime DateUpdated);

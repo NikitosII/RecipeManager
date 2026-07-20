@@ -49,6 +49,7 @@ public class GetRecipeByIdQueryHandler(
                 ri.Ingredient?.Name ?? string.Empty,
                 ri.Quantity,
                 ri.Unit)).ToList(),
+            NutritionMapping.Resolve(recipe),
             recipe.DateCreated,
             recipe.DateUpdated);
     }
