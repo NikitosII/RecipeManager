@@ -34,6 +34,7 @@
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.10.0" />
 
     <!-- Infrastructure extras -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.9" />

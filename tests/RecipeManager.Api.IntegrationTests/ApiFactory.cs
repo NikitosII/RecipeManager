@@ -6,7 +6,6 @@ namespace RecipeManager.Api.IntegrationTests;
 
 public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    // A stable 32+ byte key for the test host. The real signing key lives in user secrets, which are not available on CI.
     private const string TestSigningKey = "integration-tests-signing-key-that-is-at-least-32-bytes";
 
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:17")
@@ -15,6 +14,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public ApiFactory()
     {
         Environment.SetEnvironmentVariable("Jwt__SigningKey", TestSigningKey);
+        Environment.SetEnvironmentVariable("Nutrition__Enabled", "false");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -25,7 +25,6 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     async Task IAsyncLifetime.InitializeAsync()
     {
         await _database.StartAsync();
-        // The container's connection string is only known after it starts.
         Environment.SetEnvironmentVariable("ConnectionStrings__RecipeDb", _database.GetConnectionString());
     }
 
@@ -33,6 +32,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     async Task IAsyncLifetime.DisposeAsync()
     {
         Environment.SetEnvironmentVariable("Jwt__SigningKey", null);
+        Environment.SetEnvironmentVariable("Nutrition__Enabled", null);
         Environment.SetEnvironmentVariable("ConnectionStrings__RecipeDb", null);
         await _database.DisposeAsync();
         await base.DisposeAsync();

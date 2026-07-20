@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using RecipeManager.Application.Configuration;
 using RecipeManager.Application.Interfaces;
 using RecipeManager.Domain.Interfaces;
@@ -19,6 +20,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<NutritionOptions>(configuration.GetSection(NutritionOptions.SectionName));
 
         services.AddDbContext<RecipeDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("RecipeDb")));
@@ -50,6 +52,14 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddSingleton<IFileStorageService, LocalFileStorageService>();
+
+        // Typed client for the USDA nutrition lookup.
+        services.AddHttpClient<INutritionProvider, UsdaNutritionProvider>((sp, client) =>
+        {
+            var nutrition = sp.GetRequiredService<IOptions<NutritionOptions>>().Value;
+            client.BaseAddress = new Uri(nutrition.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
 
         return services;
     }
