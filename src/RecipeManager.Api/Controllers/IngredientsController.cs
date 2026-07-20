@@ -26,6 +26,15 @@ public class IngredientsController(IMediator mediator) : ControllerBase
         var id = await mediator.Send(new CreateIngredientCommand(request.Name), cancellationToken);
         return Created(string.Empty, new { id });
     }
+
+    // Re-fetches the ingredient's per-100g macros from the nutrition source.
+    [HttpPost("{id:guid}/nutrition/refresh")]
+    [Authorize]
+    public async Task<IActionResult> RefreshNutrition(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new RefreshIngredientNutritionCommand(id), cancellationToken);
+        return Ok(result);
+    }
 }
 
 public record CreateIngredientRequest(string Name);

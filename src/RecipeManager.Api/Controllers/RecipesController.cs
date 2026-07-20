@@ -125,6 +125,26 @@ public class RecipesController(IMediator mediator) : ControllerBase
         return Ok(new { imageUrl });
     }
 
+    // -- Nutrition -- //
+
+    [HttpPut("{id:guid}/nutrition")]
+    public async Task<IActionResult> UpdateNutrition(Guid id, [FromBody] UpdateNutritionRequest request, CancellationToken cancellationToken)
+    {
+        var nutrition = await mediator.Send(
+            new UpdateRecipeNutritionCommand(
+                id,
+                request.Mode,
+                request.Calories,
+                request.Protein,
+                request.Fat,
+                request.Carbohydrates,
+                request.Fiber,
+                CurrentUserId),
+            cancellationToken);
+
+        return Ok(nutrition);
+    }
+
     // -- Ratings -- //
 
     [HttpPut("{id:guid}/rating")]
@@ -203,6 +223,14 @@ public record UpdateRecipeRequest(
     int PrepTimeMinutes,
     int CookTimeMinutes,
     int Servings);
+
+public record UpdateNutritionRequest(
+    NutritionMode Mode,
+    decimal? Calories,
+    decimal? Protein,
+    decimal? Fat,
+    decimal? Carbohydrates,
+    decimal? Fiber);
 
 public record RateRecipeRequest(int Value);
 
