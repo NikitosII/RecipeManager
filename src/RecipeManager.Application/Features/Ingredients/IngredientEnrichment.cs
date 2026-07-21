@@ -13,9 +13,15 @@ internal static class IngredientEnrichment
         Ingredient ingredient, INutritionProvider nutritionProvider, CancellationToken cancellationToken)
     {
         var facts = await nutritionProvider.LookupAsync(ingredient.Name, cancellationToken);
-        if (facts is not null)
-            ingredient.SetNutritionFacts(
-                facts.CaloriesPer100g, facts.ProteinPer100g, facts.FatPer100g,
-                facts.CarbsPer100g, facts.FiberPer100g);
+        if (facts is null)
+            return;
+
+        ingredient.SetNutritionFacts(
+            facts.CaloriesPer100g, facts.ProteinPer100g, facts.FatPer100g,
+            facts.CarbsPer100g, facts.FiberPer100g);
+
+        // Cache conversion hints so volume/piece quantities can be turned into grams.
+        if (facts.DensityGramsPerMl is not null || facts.GramsPerPiece is not null)
+            ingredient.SetConversion(facts.DensityGramsPerMl, facts.GramsPerPiece);
     }
 }
