@@ -23,11 +23,8 @@ public class CreateIngredientCommandHandler(IIngredientRepository ingredientRepo
             throw new ConflictException($"An ingredient named '{name}' already exists.");
 
         var ingredient = new Ingredient(name);
-        var facts = await nutritionProvider.LookupAsync(name, cancellationToken);
-        if (facts is not null)
-            ingredient.SetNutritionFacts(
-                facts.CaloriesPer100g, facts.ProteinPer100g, facts.FatPer100g,
-                facts.CarbsPer100g, facts.FiberPer100g);
+        await IngredientEnrichment.EnrichAsync(ingredient, nutritionProvider, cancellationToken);
+
         await ingredientRepository.AddAsync(ingredient, cancellationToken);
         await ingredientRepository.SaveChangesAsync(cancellationToken);
 

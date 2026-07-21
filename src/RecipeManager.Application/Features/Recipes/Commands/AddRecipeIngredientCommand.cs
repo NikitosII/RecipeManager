@@ -1,5 +1,7 @@
 using MediatR;
 using RecipeManager.Application.DTOs;
+using RecipeManager.Application.Features.Ingredients;
+using RecipeManager.Application.Interfaces;
 using RecipeManager.Domain.Entities;
 using RecipeManager.Domain.Enums;
 using RecipeManager.Domain.Exceptions;
@@ -13,7 +15,7 @@ namespace RecipeManager.Application.Features.Recipes.Commands;
 /// </summary>
 public record AddRecipeIngredientCommand(Guid RecipeId, string IngredientName, decimal Quantity, MeasurementUnit Unit, Guid RequestingUserId) : IRequest<RecipeIngredientDto>;
 
-public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepository, IIngredientRepository ingredientRepository)
+public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepository, IIngredientRepository ingredientRepository, INutritionProvider nutritionProvider)
     : IRequestHandler<AddRecipeIngredientCommand, RecipeIngredientDto>
 {
     public async Task<RecipeIngredientDto> Handle(AddRecipeIngredientCommand request, CancellationToken cancellationToken)
@@ -35,6 +37,10 @@ public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepositor
             ingredient = new Ingredient(name);
             await ingredientRepository.AddAsync(ingredient, cancellationToken);
         }
+
+        if (!ingredient.HasNutrition)
+            await IngredientEnrichment.EnrichAsync(ingredient, nutritionProvider, cancellationToken);
+
         recipe.AddIngredient(ingredient.Id, request.Quantity, request.Unit);
 
         await recipeRepository.SaveChangesAsync(cancellationToken);

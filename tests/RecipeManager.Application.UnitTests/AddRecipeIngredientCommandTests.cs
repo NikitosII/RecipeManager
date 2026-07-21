@@ -1,5 +1,6 @@
 using NSubstitute;
 using RecipeManager.Application.Features.Recipes.Commands;
+using RecipeManager.Application.Interfaces;
 using RecipeManager.Domain.Entities;
 using RecipeManager.Domain.Enums;
 using RecipeManager.Domain.Exceptions;
@@ -11,8 +12,9 @@ public class AddRecipeIngredientCommandTests
 {
     private readonly IRecipeRepository _recipes = Substitute.For<IRecipeRepository>();
     private readonly IIngredientRepository _ingredients = Substitute.For<IIngredientRepository>();
+    private readonly INutritionProvider _nutrition = Substitute.For<INutritionProvider>();
 
-    private AddRecipeIngredientCommandHandler CreateHandler() => new(_recipes, _ingredients);
+    private AddRecipeIngredientCommandHandler CreateHandler() => new(_recipes, _ingredients, _nutrition);
 
     private static Recipe NewRecipe() =>
         new("Soup", null, DifficultyLevel.Easy, 5, 20, 4, Guid.NewGuid(), Guid.NewGuid());
@@ -50,6 +52,44 @@ public class AddRecipeIngredientCommandTests
         await _ingredients.Received(1).AddAsync(Arg.Is<Ingredient>(i => i.Name == "Basil"), Arg.Any<CancellationToken>());
         Assert.Equal("Basil", result.IngredientName);
         Assert.Single(recipe.RecipeIngredients);
+    }
+
+    [Fact]
+    public async Task Handle_NewIngredient_CachesNutritionFromTheProvider()
+    {
+        var recipe = NewRecipe();
+        _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
+        _ingredients.GetByNameAsync("Flour", Arg.Any<CancellationToken>()).Returns((Ingredient?)null);
+        _nutrition.LookupAsync("Flour", Arg.Any<CancellationToken>())
+            .Returns(new NutritionLookup(364m, 10m, 1m, 76m, 2.7m));
+
+        Ingredient? created = null;
+        await _ingredients.AddAsync(Arg.Do<Ingredient>(i => created = i), Arg.Any<CancellationToken>());
+
+        var command = new AddRecipeIngredientCommand(recipe.Id, "Flour", 100, MeasurementUnit.Gram, recipe.UserId);
+        await CreateHandler().Handle(command, CancellationToken.None);
+
+        Assert.NotNull(created);
+        Assert.True(created!.HasNutrition);
+        Assert.Equal(364m, created.CaloriesPer100g);
+        Assert.Equal(2.7m, created.FiberPer100g);
+    }
+
+    [Fact]
+    public async Task Handle_ExistingIngredientWithoutNutrition_BackfillsFromTheProvider()
+    {
+        var recipe = NewRecipe();
+        var existing = new Ingredient("Flour"); // created before nutrition existed -> no macros
+        _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
+        _ingredients.GetByNameAsync("Flour", Arg.Any<CancellationToken>()).Returns(existing);
+        _nutrition.LookupAsync("Flour", Arg.Any<CancellationToken>())
+            .Returns(new NutritionLookup(364m, 10m, 1m, 76m, 2.7m));
+
+        var command = new AddRecipeIngredientCommand(recipe.Id, "Flour", 50, MeasurementUnit.Gram, recipe.UserId);
+        await CreateHandler().Handle(command, CancellationToken.None);
+
+        Assert.True(existing.HasNutrition);
+        Assert.Equal(364m, existing.CaloriesPer100g);
     }
 
     [Theory]
