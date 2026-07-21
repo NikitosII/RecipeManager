@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { recipesApi } from '@/lib/api'
-import type { RecipeListParams, UpdateRecipePayload } from '@/lib/api'
+import { ingredientsApi, recipesApi } from '@/lib/api'
+import type { RecipeListParams, UpdateNutritionPayload, UpdateRecipePayload } from '@/lib/api'
 
 export const recipeKeys = {
   all: ['recipes'] as const,
@@ -40,5 +40,24 @@ export function useUpdateRecipe(id: string) {
       void queryClient.invalidateQueries({ queryKey: recipeKeys.detail(id) })
       void queryClient.invalidateQueries({ queryKey: recipeKeys.all })
     },
+  })
+}
+
+export function useUpdateNutrition(id: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: UpdateNutritionPayload) => recipesApi.updateNutrition(id, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: recipeKeys.detail(id) }),
+  })
+}
+
+// Re-fetches nutrition for the given ingredients, then refreshes the recipe so the
+// per-serving figures recalculate. Used to backfill ingredients that have no data yet.
+export function useRefreshNutrition(recipeId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (ingredientIds: string[]) =>
+      Promise.all(ingredientIds.map((id) => ingredientsApi.refreshNutrition(id))),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) }),
   })
 }

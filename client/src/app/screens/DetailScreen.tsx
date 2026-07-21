@@ -10,20 +10,22 @@ import {
   Heart,
   Pencil,
   Plus,
+  RefreshCw,
+  Sparkles,
   Trash2,
   User,
   Users,
   Utensils,
+  X,
 } from 'lucide-react'
-import { useDeleteRecipe, useRecipe } from '@/hooks/use-recipes'
+import { useDeleteRecipe, useRecipe, useRefreshNutrition, useUpdateNutrition } from '@/hooks/use-recipes'
 import { useToggleFavorite } from '@/hooks/use-favorites'
 import { useAddRecipeToCollection, useCollections, useCreateCollection } from '@/hooks/use-collections'
 import { useRateRecipe, useRemoveRating } from '@/hooks/use-ratings'
 import { useAuthStore } from '@/stores/auth-store'
 import { resolveMediaUrl } from '@/config'
-import { MeasurementUnitLabel } from '@/types/api'
+import { MeasurementUnitLabel, NutritionMode, UncountedReasonLabel } from '@/types/api'
 import type { RecipeDetail } from '@/types/api'
-import { PLACEHOLDER_NUTRITION } from '../placeholders'
 import { CategoryBadge, RatingStars, RatingSummary } from '../components/ui-bits'
 
 export function DetailScreen({
@@ -333,37 +335,218 @@ export function DetailScreen({
             )}
           </div>
 
-          {/* Nutrition — static decoration (not stored by the backend) */}
-          <div className="bg-white rounded-2xl border border-border p-5">
-            <h3
-              className="font-semibold text-[#2C1A0E] mb-4 text-base"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Nutrition per serving
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Calories', value: `${PLACEHOLDER_NUTRITION.calories} kcal`, highlight: true },
-                { label: 'Protein', value: PLACEHOLDER_NUTRITION.protein, highlight: false },
-                { label: 'Carbohydrates', value: PLACEHOLDER_NUTRITION.carbs, highlight: false },
-                { label: 'Fat', value: PLACEHOLDER_NUTRITION.fat, highlight: false },
-                { label: 'Fiber', value: PLACEHOLDER_NUTRITION.fiber, highlight: false },
-              ].map((n) => (
-                <div
-                  key={n.label}
-                  className={`rounded-xl p-3 ${
-                    n.highlight ? 'bg-rose-50 col-span-2 flex items-center justify-between' : 'bg-muted/50'
-                  }`}
-                >
-                  <p className="text-xs text-muted-foreground">{n.label}</p>
-                  <p className={`font-semibold text-[#2C1A0E] ${n.highlight ? 'text-lg' : 'text-sm mt-0.5'}`}>
-                    {n.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Nutrition — calculated from the ingredients, or entered by the author */}
+          <NutritionPanel recipe={recipe} isOwner={isOwner} canRefresh={Boolean(currentUser)} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+function NutritionPanel({
+  recipe,
+  isOwner,
+  canRefresh,
+}: {
+  recipe: RecipeDetail
+  isOwner: boolean
+  canRefresh: boolean
+}) {
+  const n = recipe.nutrition
+  const [editing, setEditing] = useState(false)
+  const refresh = useRefreshNutrition(recipe.id)
+
+  const isManual = n.mode === NutritionMode.Manual
+  const hasValues = isManual || n.hasAnyData
+
+  const caption = isManual
+    ? 'Per serving · entered by the author'
+    : n.isComplete
+      ? 'Per serving · calculated from all ingredients'
+      : `Per serving · based on ${n.countedCount} of ${n.totalCount} ingredients`
+
+  // The ids of the ingredients that were left out, so we can try to backfill just those.
+  const uncountedNames = new Set(n.uncounted.map((u) => u.name))
+  const idsToRefresh = recipe.ingredients
+    .filter((i) => uncountedNames.has(i.ingredientName))
+    .map((i) => i.ingredientId)
+  const showRefresh = canRefresh && !isManual && idsToRefresh.length > 0
+
+  const refreshButton = showRefresh ? (
+    <button
+      onClick={() => refresh.mutate(idsToRefresh)}
+      disabled={refresh.isPending}
+      className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#D94F3A] hover:text-[#C0392B] disabled:opacity-60"
+    >
+      <RefreshCw size={12} className={refresh.isPending ? 'animate-spin' : ''} />
+      {refresh.isPending ? 'Fetching nutrition data…' : 'Fetch nutrition data'}
+    </button>
+  ) : null
+
+  const rows = [
+    { label: 'Calories', value: `${n.calories} kcal`, highlight: true },
+    { label: 'Protein', value: `${n.protein} g`, highlight: false },
+    { label: 'Carbohydrates', value: `${n.carbohydrates} g`, highlight: false },
+    { label: 'Fat', value: `${n.fat} g`, highlight: false },
+    ...(n.fiber != null ? [{ label: 'Fiber', value: `${n.fiber} g`, highlight: false }] : []),
+  ]
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5">
+      <div className="flex items-center justify-between mb-2">
+        <h3
+          className="font-semibold text-[#2C1A0E] text-base"
+          style={{ fontFamily: "'Playfair Display', serif" }}
+        >
+          Nutrition
+        </h3>
+        {isOwner && !editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 text-xs font-medium text-[#D94F3A] hover:text-[#C0392B]"
+          >
+            <Pencil size={12} /> Edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <NutritionEditor recipe={recipe} onDone={() => setEditing(false)} />
+      ) : hasValues ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-4">{caption}</p>
+          <div className="grid grid-cols-2 gap-3">
+            {rows.map((r) => (
+              <div
+                key={r.label}
+                className={`rounded-xl p-3 ${
+                  r.highlight ? 'bg-rose-50 col-span-2 flex items-center justify-between' : 'bg-muted/50'
+                }`}
+              >
+                <p className="text-xs text-muted-foreground">{r.label}</p>
+                <p className={`font-semibold text-[#2C1A0E] ${r.highlight ? 'text-lg' : 'text-sm mt-0.5'}`}>
+                  {r.value}
+                </p>
+              </div>
+            ))}
+          </div>
+          {!isManual && n.uncounted.length > 0 && (
+            <p className="text-[11px] text-muted-foreground mt-3">
+              Not included:{' '}
+              {n.uncounted
+                .map((u) => `${u.name} (${UncountedReasonLabel[u.reason] ?? 'unknown'})`)
+                .join(', ')}
+              .
+            </p>
+          )}
+          {refreshButton}
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            No nutrition yet — these ingredients don't have nutrition data.
+            {isOwner ? ' Use Edit to enter values by hand.' : ''}
+          </p>
+          {refreshButton}
+        </>
+      )}
+    </div>
+  )
+}
+
+function NutritionEditor({ recipe, onDone }: { recipe: RecipeDetail; onDone: () => void }) {
+  const n = recipe.nutrition
+  const update = useUpdateNutrition(recipe.id)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    calories: String(n.calories ?? ''),
+    protein: String(n.protein ?? ''),
+    carbohydrates: String(n.carbohydrates ?? ''),
+    fat: String(n.fat ?? ''),
+    fiber: n.fiber != null ? String(n.fiber) : '',
+  })
+
+  const fields: { key: keyof typeof form; label: string; suffix: string }[] = [
+    { key: 'calories', label: 'Calories', suffix: 'kcal' },
+    { key: 'protein', label: 'Protein', suffix: 'g' },
+    { key: 'carbohydrates', label: 'Carbohydrates', suffix: 'g' },
+    { key: 'fat', label: 'Fat', suffix: 'g' },
+    { key: 'fiber', label: 'Fiber (optional)', suffix: 'g' },
+  ]
+
+  const saveManual = () => {
+    const core = {
+      calories: Number(form.calories),
+      protein: Number(form.protein),
+      fat: Number(form.fat),
+      carbohydrates: Number(form.carbohydrates),
+    }
+    if (Object.values(core).some((v) => !Number.isFinite(v) || v < 0)) {
+      setError('Calories, protein, fat and carbohydrates are required and must be 0 or more.')
+      return
+    }
+    const fiber = form.fiber.trim() === '' ? null : Number(form.fiber)
+    if (fiber != null && (!Number.isFinite(fiber) || fiber < 0)) {
+      setError('Fiber must be a number of 0 or more.')
+      return
+    }
+    setError(null)
+    update.mutate({ mode: NutritionMode.Manual, ...core, fiber }, { onSuccess: onDone })
+  }
+
+  const useAutomatic = () => {
+    setError(null)
+    update.mutate({ mode: NutritionMode.Auto }, { onSuccess: onDone })
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-3">
+        Enter per-serving values, or switch back to automatic calculation.
+      </p>
+
+      <div className="space-y-2.5">
+        {fields.map((f) => (
+          <label key={f.key} className="flex items-center gap-2 text-sm">
+            <span className="w-28 text-muted-foreground">{f.label}</span>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              inputMode="decimal"
+              value={form[f.key]}
+              onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              className="flex-1 min-w-0 rounded-lg border border-border bg-input-background px-3 py-1.5 text-sm"
+            />
+            <span className="w-8 text-xs text-muted-foreground">{f.suffix}</span>
+          </label>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+      <div className="flex items-center gap-2 mt-4">
+        <button
+          onClick={saveManual}
+          disabled={update.isPending}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#D94F3A] text-white text-sm font-medium hover:bg-[#C0392B] disabled:opacity-60"
+        >
+          <Check size={14} /> Save
+        </button>
+        <button
+          onClick={onDone}
+          disabled={update.isPending}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/50"
+        >
+          <X size={14} /> Cancel
+        </button>
+        <button
+          onClick={useAutomatic}
+          disabled={update.isPending}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#D94F3A] hover:bg-rose-50 ml-auto"
+        >
+          <Sparkles size={14} /> Use automatic
+        </button>
       </div>
     </div>
   )

@@ -63,6 +63,25 @@ export const UnitOptionToEnum: Record<string, MeasurementUnit> = {
   pcs: MeasurementUnit.Piece,
 }
 
+// Mirrors the backend NutritionMode enum.
+export const NutritionMode = {
+  Auto: 1,
+  Manual: 2,
+} as const
+export type NutritionMode = (typeof NutritionMode)[keyof typeof NutritionMode]
+
+// Why an ingredient was left out of the automatic figures (backend UncountedReason).
+export const UncountedReason = {
+  MissingNutritionData: 1,
+  UnconvertibleUnit: 2,
+} as const
+export type UncountedReason = (typeof UncountedReason)[keyof typeof UncountedReason]
+
+export const UncountedReasonLabel: Record<number, string> = {
+  1: 'no nutrition data',
+  2: 'unit needs a weight',
+}
+
 // -- DTOs -- //
 
 export interface RecipeSummary {
@@ -106,6 +125,25 @@ export interface RecipeIngredient {
   unit: number
 }
 
+export interface UncountedIngredient {
+  name: string
+  reason: number
+}
+
+export interface Nutrition {
+  mode: number
+  calories: number
+  protein: number
+  fat: number
+  carbohydrates: number
+  fiber: number | null
+  isComplete: boolean
+  hasAnyData: boolean
+  countedCount: number
+  totalCount: number
+  uncounted: UncountedIngredient[]
+}
+
 export interface RecipeDetail {
   id: string
   title: string
@@ -125,6 +163,7 @@ export interface RecipeDetail {
   userRating: number | null
   steps: RecipeStep[]
   ingredients: RecipeIngredient[]
+  nutrition: Nutrition
   dateCreated: string
   dateUpdated: string
 }

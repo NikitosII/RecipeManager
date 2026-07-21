@@ -6,6 +6,7 @@ import type {
   CollectionDetail,
   Ingredient,
   MeasurementUnit,
+  Nutrition,
   Paginated,
   RecipeDetail,
   RecipeStep,
@@ -49,6 +50,10 @@ export const categoriesApi = {
 
 export const ingredientsApi = {
   list: () => apiClient.get<Ingredient[]>('/ingredients').then((r) => r.data),
+
+  // Re-fetches an ingredient's per-100g macros from the nutrition source (backfill).
+  refreshNutrition: (id: string) =>
+    apiClient.post(`/ingredients/${id}/nutrition/refresh`).then((r) => r.data),
 }
 
 // -- Recipes -- //
@@ -86,6 +91,16 @@ export interface UpdateRecipePayload {
   servings: number
 }
 
+// Mode 1 = automatic (macros are ignored); mode 2 = manual (values are required).
+export interface UpdateNutritionPayload {
+  mode: number
+  calories?: number | null
+  protein?: number | null
+  fat?: number | null
+  carbohydrates?: number | null
+  fiber?: number | null
+}
+
 export interface CreateRecipeStepInput {
   description: string
 }
@@ -116,6 +131,9 @@ export const recipesApi = {
     apiClient.put(`/recipes/${id}/rating`, { value }).then(() => undefined),
 
   removeRating: (id: string) => apiClient.delete(`/recipes/${id}/rating`).then(() => undefined),
+
+  updateNutrition: (id: string, body: UpdateNutritionPayload) =>
+    apiClient.put<Nutrition>(`/recipes/${id}/nutrition`, body).then((r) => r.data),
 
   appendStep: (id: string, description: string) =>
     apiClient.post<RecipeStep>(`/recipes/${id}/steps`, { description }).then((r) => r.data),
