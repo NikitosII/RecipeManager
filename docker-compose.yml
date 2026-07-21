@@ -28,6 +28,9 @@ services:
       Jwt__SigningKey: "docker-dev-signing-key-replace-in-production"
     ports:
       - "8080:8080"
+    volumes:
+      # Persist uploaded recipe images across container rebuilds/restarts.
+      - apiuploads:/app/wwwroot/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -44,3 +47,4 @@ services:
 
 volumes:
   pgdata:
+  apiuploads:
