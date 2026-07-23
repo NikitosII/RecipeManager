@@ -13,9 +13,7 @@ namespace RecipeManager.Application.Features.Ingredients.Commands;
 /// </summary>
 public record RefreshIngredientNutritionCommand(Guid IngredientId) : IRequest<IngredientNutritionDto>;
 
-public class RefreshIngredientNutritionCommandHandler(
-    IIngredientRepository ingredientRepository,
-    INutritionProvider nutritionProvider)
+public class RefreshIngredientNutritionCommandHandler(IIngredientRepository ingredientRepository, INutritionProvider nutritionProvider)
     : IRequestHandler<RefreshIngredientNutritionCommand, IngredientNutritionDto>
 {
     public async Task<IngredientNutritionDto> Handle(RefreshIngredientNutritionCommand request, CancellationToken cancellationToken)
@@ -23,7 +21,17 @@ public class RefreshIngredientNutritionCommandHandler(
         var ingredient = await ingredientRepository.GetByIdAsync(request.IngredientId, cancellationToken)
                          ?? throw new NotFoundException(nameof(Domain.Entities.Ingredient), request.IngredientId);
 
-        var facts = await nutritionProvider.LookupAsync(ingredient.Name, cancellationToken);
+        // interactive "fetch now" action
+        NutritionLookup? facts;
+        try
+        {
+            facts = await nutritionProvider.LookupAsync(ingredient.Name, cancellationToken);
+        }
+        catch (NutritionProviderUnavailableException)
+        {
+            facts = null;
+        }
+
         if (facts is not null)
         {
             ingredient.SetNutritionFacts(

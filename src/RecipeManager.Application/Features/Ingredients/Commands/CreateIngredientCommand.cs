@@ -8,7 +8,7 @@ namespace RecipeManager.Application.Features.Ingredients.Commands;
 
 public record CreateIngredientCommand(string Name) : IRequest<Guid>;
 
-public class CreateIngredientCommandHandler(IIngredientRepository ingredientRepository, INutritionProvider nutritionProvider)
+public class CreateIngredientCommandHandler(IIngredientRepository ingredientRepository, IIngredientEnrichmentQueue enrichmentQueue)
     : IRequestHandler<CreateIngredientCommand, Guid>
 {
     public async Task<Guid> Handle(CreateIngredientCommand request, CancellationToken cancellationToken)
@@ -23,10 +23,10 @@ public class CreateIngredientCommandHandler(IIngredientRepository ingredientRepo
             throw new ConflictException($"An ingredient named '{name}' already exists.");
 
         var ingredient = new Ingredient(name);
-        await IngredientEnrichment.EnrichAsync(ingredient, nutritionProvider, cancellationToken);
-
         await ingredientRepository.AddAsync(ingredient, cancellationToken);
         await ingredientRepository.SaveChangesAsync(cancellationToken);
+
+        enrichmentQueue.Enqueue(ingredient.Id);
 
         return ingredient.Id;
     }

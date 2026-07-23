@@ -1,6 +1,5 @@
 using MediatR;
 using RecipeManager.Application.DTOs;
-using RecipeManager.Application.Features.Ingredients;
 using RecipeManager.Application.Interfaces;
 using RecipeManager.Domain.Entities;
 using RecipeManager.Domain.Enums;
@@ -15,7 +14,7 @@ namespace RecipeManager.Application.Features.Recipes.Commands;
 /// </summary>
 public record AddRecipeIngredientCommand(Guid RecipeId, string IngredientName, decimal Quantity, MeasurementUnit Unit, Guid RequestingUserId) : IRequest<RecipeIngredientDto>;
 
-public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepository, IIngredientRepository ingredientRepository, INutritionProvider nutritionProvider)
+public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepository, IIngredientRepository ingredientRepository, IIngredientEnrichmentQueue enrichmentQueue)
     : IRequestHandler<AddRecipeIngredientCommand, RecipeIngredientDto>
 {
     public async Task<RecipeIngredientDto> Handle(AddRecipeIngredientCommand request, CancellationToken cancellationToken)
@@ -38,12 +37,14 @@ public class AddRecipeIngredientCommandHandler(IRecipeRepository recipeRepositor
             await ingredientRepository.AddAsync(ingredient, cancellationToken);
         }
 
-        if (!ingredient.HasNutrition)
-            await IngredientEnrichment.EnrichAsync(ingredient, nutritionProvider, cancellationToken);
-
+        var needsEnrichment = !ingredient.HasNutrition;
         recipe.AddIngredient(ingredient.Id, request.Quantity, request.Unit);
 
         await recipeRepository.SaveChangesAsync(cancellationToken);
+
+        if (needsEnrichment)
+            enrichmentQueue.Enqueue(ingredient.Id);
+
         return new RecipeIngredientDto(ingredient.Id, ingredient.Name, request.Quantity, request.Unit);
     }
 }

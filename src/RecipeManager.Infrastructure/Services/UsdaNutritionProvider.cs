@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -40,6 +41,12 @@ public class UsdaNutritionProvider(HttpClient httpClient, IOptions<NutritionOpti
                 logger.LogWarning(
                     "USDA nutrition lookup for '{Ingredient}' returned {StatusCode}.",
                     ingredientName, (int)response.StatusCode);
+
+                // Rate-limits (429) and server errors (5xx) are transient.
+                if (response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500)
+                    throw new NutritionProviderUnavailableException(
+                        $"USDA returned {(int)response.StatusCode} for '{ingredientName}'.");
+
                 return null;
             }
 
@@ -68,8 +75,26 @@ public class UsdaNutritionProvider(HttpClient httpClient, IOptions<NutritionOpti
             return new NutritionLookup(
                 calories.Value, protein.Value, fat.Value, carbs.Value, Value(Fiber), density, gramsPerPiece);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (NutritionProviderUnavailableException)
         {
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw; // The caller cancelled — propagate, don't dress it up as a provider failure.
+        }
+        catch (OperationCanceledException ex)
+        {
+            // HttpClient.Timeout surfaces as a TaskCanceledException not tied to our token.
+            throw new NutritionProviderUnavailableException($"USDA request timed out for '{ingredientName}'.", ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new NutritionProviderUnavailableException($"USDA request failed for '{ingredientName}'.", ex);
+        }
+        catch (Exception ex)
+        {
+            // Anything else is permanent — report "no data".
             logger.LogWarning(ex, "USDA nutrition lookup failed for '{Ingredient}'.", ingredientName);
             return null;
         }

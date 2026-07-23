@@ -61,6 +61,11 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(10);
         });
 
+        services.AddSingleton<ChannelIngredientEnrichmentQueue>();
+        services.AddSingleton<IIngredientEnrichmentQueue>(
+            sp => sp.GetRequiredService<ChannelIngredientEnrichmentQueue>());
+        services.AddHostedService<IngredientEnrichmentWorker>();
+
         return services;
     }
 }
