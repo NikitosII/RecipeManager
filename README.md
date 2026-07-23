@@ -11,6 +11,7 @@ RecipeManager lets users register, create, and share recipes — ordered cooking
   filter panel (difficulty, max prep/cook time, min servings, "must contain
   these ingredients", and sort by newest / name / top-rated).
 - **Ratings** — real per-user 1–5 star ratings, averaged on the server.
+- **Comments** — leave feedback on any recipe; edit or delete your own.
 - **Favourites & Collections** — like recipes, and organise them into your own
   private, named collections.
 - **Nutrition** — per-serving calories, protein, fat, carbohydrates, and fibre
@@ -29,9 +30,9 @@ RecipeManager lets users register, create, and share recipes — ordered cooking
 |---|---|---|
 | ![Nutrition](docs/screenshots/04-recipe-nutrition.jpg) | ![Filters](docs/screenshots/05-filters.jpg) | ![Favourites](docs/screenshots/06-favourites.jpg) |
 
-<p align="center">
-  <img src="docs/screenshots/07-profile.jpg" alt="Profile" width="480">
-</p>
+| Recipe comments | Your profile |
+|---|---|
+| ![Comments](docs/screenshots/08-comments.jpg) | ![Profile](docs/screenshots/07-profile.jpg) |
 
 ## Tech stack
 
