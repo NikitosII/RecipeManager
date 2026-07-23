@@ -12,18 +12,25 @@ public class AddRecipeIngredientCommandTests
 {
     private readonly IRecipeRepository _recipes = Substitute.For<IRecipeRepository>();
     private readonly IIngredientRepository _ingredients = Substitute.For<IIngredientRepository>();
-    private readonly INutritionProvider _nutrition = Substitute.For<INutritionProvider>();
+    private readonly IIngredientEnrichmentQueue _enrichment = Substitute.For<IIngredientEnrichmentQueue>();
 
-    private AddRecipeIngredientCommandHandler CreateHandler() => new(_recipes, _ingredients, _nutrition);
+    private AddRecipeIngredientCommandHandler CreateHandler() => new(_recipes, _ingredients, _enrichment);
 
     private static Recipe NewRecipe() =>
         new("Soup", null, DifficultyLevel.Easy, 5, 20, 4, Guid.NewGuid(), Guid.NewGuid());
+
+    private static Ingredient EnrichedIngredient(string name)
+    {
+        var ingredient = new Ingredient(name);
+        ingredient.SetNutritionFacts(100m, 5m, 2m, 10m, 1m);
+        return ingredient;
+    }
 
     [Fact]
     public async Task Handle_ExistingIngredient_ReusesItWithoutCreating()
     {
         var recipe = NewRecipe();
-        var existing = new Ingredient("Salt");
+        var existing = EnrichedIngredient("Salt");
         _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
         _ingredients.GetByNameAsync("Salt", Arg.Any<CancellationToken>()).Returns(existing);
 
@@ -55,13 +62,11 @@ public class AddRecipeIngredientCommandTests
     }
 
     [Fact]
-    public async Task Handle_NewIngredient_CachesNutritionFromTheProvider()
+    public async Task Handle_NewIngredient_QueuesEnrichmentAfterSave()
     {
         var recipe = NewRecipe();
         _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
         _ingredients.GetByNameAsync("Flour", Arg.Any<CancellationToken>()).Returns((Ingredient?)null);
-        _nutrition.LookupAsync("Flour", Arg.Any<CancellationToken>())
-            .Returns(new NutritionLookup(364m, 10m, 1m, 76m, 2.7m));
 
         Ingredient? created = null;
         await _ingredients.AddAsync(Arg.Do<Ingredient>(i => created = i), Arg.Any<CancellationToken>());
@@ -70,26 +75,36 @@ public class AddRecipeIngredientCommandTests
         await CreateHandler().Handle(command, CancellationToken.None);
 
         Assert.NotNull(created);
-        Assert.True(created!.HasNutrition);
-        Assert.Equal(364m, created.CaloriesPer100g);
-        Assert.Equal(2.7m, created.FiberPer100g);
+        await _recipes.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        _enrichment.Received(1).Enqueue(created!.Id);
     }
 
     [Fact]
-    public async Task Handle_ExistingIngredientWithoutNutrition_BackfillsFromTheProvider()
+    public async Task Handle_ExistingIngredientWithoutNutrition_QueuesEnrichment()
     {
         var recipe = NewRecipe();
         var existing = new Ingredient("Flour"); // created before nutrition existed -> no macros
         _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
         _ingredients.GetByNameAsync("Flour", Arg.Any<CancellationToken>()).Returns(existing);
-        _nutrition.LookupAsync("Flour", Arg.Any<CancellationToken>())
-            .Returns(new NutritionLookup(364m, 10m, 1m, 76m, 2.7m));
 
         var command = new AddRecipeIngredientCommand(recipe.Id, "Flour", 50, MeasurementUnit.Gram, recipe.UserId);
         await CreateHandler().Handle(command, CancellationToken.None);
 
-        Assert.True(existing.HasNutrition);
-        Assert.Equal(364m, existing.CaloriesPer100g);
+        _enrichment.Received(1).Enqueue(existing.Id);
+    }
+
+    [Fact]
+    public async Task Handle_ExistingIngredientWithNutrition_DoesNotQueueEnrichment()
+    {
+        var recipe = NewRecipe();
+        var existing = EnrichedIngredient("Flour");
+        _recipes.GetByIdWithDetailsAsync(recipe.Id, Arg.Any<CancellationToken>()).Returns(recipe);
+        _ingredients.GetByNameAsync("Flour", Arg.Any<CancellationToken>()).Returns(existing);
+
+        var command = new AddRecipeIngredientCommand(recipe.Id, "Flour", 50, MeasurementUnit.Gram, recipe.UserId);
+        await CreateHandler().Handle(command, CancellationToken.None);
+
+        _enrichment.DidNotReceive().Enqueue(Arg.Any<Guid>());
     }
 
     [Theory]
@@ -134,5 +149,6 @@ public class AddRecipeIngredientCommandTests
 
         await Assert.ThrowsAsync<ForbiddenException>(() => CreateHandler().Handle(command, CancellationToken.None));
         await _recipes.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        _enrichment.DidNotReceive().Enqueue(Arg.Any<Guid>());
     }
 }
