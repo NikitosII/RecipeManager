@@ -29,7 +29,6 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Persist uploaded recipe images across container rebuilds/restarts.
       - apiuploads:/app/wwwroot/uploads
     depends_on:
       db:

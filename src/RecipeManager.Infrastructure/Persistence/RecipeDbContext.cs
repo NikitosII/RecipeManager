@@ -21,6 +21,7 @@ public class RecipeDbContext(DbContextOptions<RecipeDbContext> options)
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<CollectionRecipe> CollectionRecipes => Set<CollectionRecipe>();
     public DbSet<Rating> Ratings => Set<Rating>();
+    public DbSet<Comment> Comments => Set<Comment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -168,6 +168,17 @@ export interface RecipeDetail {
   dateUpdated: string
 }
 
+export interface Comment {
+  id: string
+  userId: string
+  authorName: string
+  authorAvatarUrl: string | null
+  body: string
+  canEdit: boolean
+  dateCreated: string
+  dateUpdated: string
+}
+
 export interface Category {
   id: string
   name: string

@@ -4,6 +4,7 @@ import type {
   Category,
   Collection,
   CollectionDetail,
+  Comment,
   Ingredient,
   MeasurementUnit,
   Nutrition,
@@ -161,6 +162,21 @@ export const favoritesApi = {
   add: (recipeId: string) => apiClient.put(`/favorites/${recipeId}`).then(() => undefined),
 
   remove: (recipeId: string) => apiClient.delete(`/favorites/${recipeId}`).then(() => undefined),
+}
+
+// -- Comments -- //
+
+export const commentsApi = {
+  list: (recipeId: string) =>
+    apiClient.get<Comment[]>(`/recipes/${recipeId}/comments`).then((r) => r.data),
+
+  add: (recipeId: string, body: string) =>
+    apiClient.post<Comment>(`/recipes/${recipeId}/comments`, { body }).then((r) => r.data),
+
+  update: (id: string, body: string) =>
+    apiClient.put<Comment>(`/comments/${id}`, { body }).then((r) => r.data),
+
+  remove: (id: string) => apiClient.delete(`/comments/${id}`).then(() => undefined),
 }
 
 // -- Collections -- //

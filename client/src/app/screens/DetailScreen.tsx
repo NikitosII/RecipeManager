@@ -27,6 +27,7 @@ import { resolveMediaUrl } from '@/config'
 import { MeasurementUnitLabel, NutritionMode, UncountedReasonLabel } from '@/types/api'
 import type { RecipeDetail } from '@/types/api'
 import { CategoryBadge, RatingStars, RatingSummary } from '../components/ui-bits'
+import { CommentsSection } from '../components/CommentsSection'
 
 export function DetailScreen({
   recipeId,
@@ -338,6 +339,11 @@ export function DetailScreen({
           {/* Nutrition — calculated from the ingredients, or entered by the author */}
           <NutritionPanel recipe={recipe} isOwner={isOwner} canRefresh={Boolean(currentUser)} />
         </div>
+      </div>
+
+      {/* Comments */}
+      <div className="max-w-6xl mx-auto px-5 pb-14">
+        <CommentsSection recipeId={recipe.id} />
       </div>
     </div>
   )
